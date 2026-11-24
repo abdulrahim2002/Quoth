@@ -1,0 +1,23 @@
+{
+  "environment": "production",
+  "flatpak_commit": "626534fa4ce746b9460b694f79e06819e4d0a77bd320708d5c17ff9dd58e72d2",
+  "inputs": {
+    "arch": {
+      "filename": "quoth-0.1.0-1-x86_64.pkg.tar.zst",
+      "sha256": "076c7b1fb17431a4e3d2c4ee8725f85ee320fccffdc1286c86fb4ff5f18134f4"
+    },
+    "deb": {
+      "filename": "quoth_0.1.0_amd64.deb",
+      "sha256": "274ef381cd20c4dca7391e17e71ffe189bf7656bc75f8444caf54a5de16bb924"
+    },
+    "flatpak": {
+      "filename": "quoth.flatpak",
+      "sha256": "8812343105c082ea2824d954f789b6fd9607c10b8f1a3fbf8766b842dbba8413"
+    }
+  },
+  "release": "quoth@0.1.0",
+  "signing_fingerprint": "4FDF9B2D9536D35965B12B2E14213C5630FC4554",
+  "source_commit": "d1aa33a28592dc96b11dfacc84f5dc2aa204c758",
+  "target": "production",
+  "version": "0.1.0"
+}

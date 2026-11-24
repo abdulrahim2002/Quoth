@@ -1,0 +1,19 @@
+Architectures: amd64
+Codename: stable
+Components: main
+Date: Tue, 24 Nov 2026 17:09:25 +0000
+Label: Quoth
+Origin: Quoth
+Suite: stable
+MD5Sum:
+ 7e7d47281a301d6b93393e6301d6201a             2045 main/binary-amd64/Packages
+ 36a2b81413b431fc821891c6d7fc077d             1225 main/binary-amd64/Packages.gz
+SHA1:
+ a7c0b0dd824467211a987f44809026b7bd4b62df             2045 main/binary-amd64/Packages
+ 1b8d930bc8acf4e40c4a32cd48442eb9d58d8c2d             1225 main/binary-amd64/Packages.gz
+SHA256:
+ 6a55a6ddd83775e1916bd3cd73497e76bf3508dc81a01d57b8eafee75472f45d             2045 main/binary-amd64/Packages
+ 2bdde561871f52296f68a119a8745b14c11a6bd8ffd661ef07baa3302e26a553             1225 main/binary-amd64/Packages.gz
+SHA512:
+ e4690320b85a824d190d27ef15dfa715b4e5897b9e284845f7c827de201dc2e2f55f4bdfe3975e47df46b02e9f0415e8131df41f89d53372410ae4a819400eb7             2045 main/binary-amd64/Packages
+ db111c5450a6b925c16d294ae0d5fa54306fde7cb8bd47b89c789f6eaaf95ab33f47b47da907f13b92e183a0d921552291f99b49116b8dfd8a802fce311dac47             1225 main/binary-amd64/Packages.gz

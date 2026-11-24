@@ -1,0 +1,8 @@
+[Flatpak Ref]
+Name=dev.quoth.Quoth
+Branch=master
+Title=Quoth
+IsRuntime=false
+Url=https://packages.quoth.dev/flatpak/repo
+GPGKey=mDMEavSpgRYJKwYBBAHaRw8BAQdAqH9PGDeI1oKsIE11zBq3o9YbZv0HoEJHxSm9KtIUjZ20I1F1b3RoIHBhY2thZ2VzIDxwYWNrYWdlc0BxdW90aC5kZXY+iJMEExYKADsWIQRP35stlTbTWWWxKy4UITxWMPxFVAUCavSpgQIbAwULCQgHAgIiAgYVCgkICwIEFgIDAQIeBwIXgAAKCRAUITxWMPxFVJU+APsEmSCNf02jGA32duTIFl9GyhFrrbyXGr0fZ2yBRofP4gD/eF30n56CnfC2t0E3eUcbjqtwp+ZQZDHk/CRa/a7v1wM=
+RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
