@@ -1,0 +1,85 @@
+Source: quoth
+Section: sound
+Priority: optional
+Maintainer: Samuel Ruairí Bullard <samuel.ruairi.bullard@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ pybuild-plugin-pyproject,
+ python3-all,
+ python3-hatchling,
+ cmake,
+ g++,
+ glslc,
+ libshaderc-dev,
+ spirv-headers,
+ libvulkan-dev,
+ meson,
+ ninja-build,
+ libgtk-4-dev,
+ libgirepository1.0-dev,
+ gobject-introspection,
+ libwayland-dev,
+ wayland-protocols (>= 1.39),
+ git
+Standards-Version: 4.7.2
+Homepage: https://quoth.dev
+Rules-Requires-Root: no
+
+Package: quoth
+Architecture: amd64
+# The UI uses libadwaita 1.5 APIs (Adw.AlertDialog / Adw.AboutDialog) and the CLI
+# GLib 2.80 ones (--version, error output), so both typelib floors are gated: apt
+# refuses cleanly on too-old distros (Ubuntu 22.04, Debian 12) instead of installing
+# and crashing at startup. Those get the Flatpak.
+Depends:
+ ${python3:Depends},
+ ${shlibs:Depends},
+ ${misc:Depends},
+ python3-gi,
+ python3-gi-cairo,
+ gir1.2-glib-2.0 (>= 2.80),
+ gir1.2-gtk-4.0,
+ gir1.2-adw-1 (>= 1.5),
+ gir1.2-pango-1.0,
+ libgtk-4-1,
+ libgtk-4-media-gstreamer,
+ libadwaita-1-0,
+ python3-numpy,
+ python3-evdev,
+ python3-loguru,
+ python3-cairo,
+ python3-certifi,
+ python3-urllib3 (>= 1.26.11),
+ gir1.2-gstreamer-1.0,
+ gstreamer1.0-plugins-base,
+ gstreamer1.0-plugins-good,
+ gstreamer1.0-pipewire,
+ libc6,
+ libgcc-s1,
+ libstdc++6,
+ libgomp1,
+ libvulkan1,
+ libwayland-client0,
+ libzstd1,
+ zlib1g,
+ wtype,
+ desktop-file-utils,
+ hicolor-icon-theme
+Suggests:
+ gnome-shell-extension-appindicator
+Description: Offline, private, instant voice dictation for Linux
+ Quoth turns speech into text entirely on-device. Press a key, speak, and the
+ transcription appears in the focused window. Your voice and text never leave
+ the machine.
+ .
+ It runs whisper.cpp with a Vulkan GPU backend (AMD / NVIDIA / Intel) and CPU
+ always, plus an optional Intel-NPU encoder offload via a bundled OpenVINO
+ runtime and Intel's user-space NPU driver. The overlay uses a bundled
+ gtk4-layer-shell for precise positioning on compositors that offer
+ layer-shell, and elsewhere suppresses the pill and shows recording state via
+ the system tray.
+ .
+ This package needs libadwaita 1.5 or newer (Ubuntu 24.04 or newer, Debian 13 or
+ newer). On Ubuntu 22.04 or Debian 12, apt will refuse to install it; use the
+ Flatpak instead, which bundles its own runtime.

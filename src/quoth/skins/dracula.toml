@@ -1,0 +1,26 @@
+# Dracula (https://draculatheme.com): Alucard by day, Dracula by night.
+kind = "skin"
+schema = 1
+
+[meta]
+name        = "Dracula"
+author      = "Quoth (port of Dracula and Alucard)"
+description = "Purple on near-black, with its warm Alucard light variant."
+
+[light]
+window    = "#FFFBEB" # Alucard Background
+view      = "#FFFBEB" # Alucard Background
+card      = "#FFFBEB" # Alucard Background
+popover   = "#FFFBEB" # Alucard Background
+text      = "#1F1F1F" # Alucard Foreground
+accent    = "#644AC9" # Alucard Purple
+on_accent = "#FFFBEB" # Alucard Background
+
+[dark]
+window    = "#282A36" # Background
+view      = "#282A36" # Background
+card      = "#44475A" # Current Line
+popover   = "#44475A" # Current Line
+text      = "#F8F8F2" # Foreground
+accent    = "#BD93F9" # Purple
+on_accent = "#282A36" # Background

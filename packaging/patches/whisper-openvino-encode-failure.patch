@@ -1,0 +1,14 @@
+diff --git a/src/whisper.cpp b/src/whisper.cpp
+--- a/src/whisper.cpp
++++ b/src/whisper.cpp
+@@ -2474,7 +2474,9 @@ static bool whisper_encode_internal(
+                     return false;
+                 }
+ #elif defined(WHISPER_USE_OPENVINO)
+-                whisper_openvino_encode(wstate.ctx_openvino, mel, wstate.embd_enc);
++                if (!whisper_openvino_encode(wstate.ctx_openvino, mel, wstate.embd_enc)) {
++                    return false;
++                }
+ #endif
+             }
+         }

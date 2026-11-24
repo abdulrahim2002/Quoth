@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: every job only reads the repository.
+permissions:
+  contents: read
+
+# Only pull requests cancel a run in progress; on main a newer run waits for it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Pull requests always run on GitHub-hosted runners. Other events use the runner the
+# TRUSTED_RUNNER variable names, or ubuntu-24.04 when it is unset.
+# Steps gated on runner.environment set up a hosted runner.
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The AUR and Flatpak recipes carry copies of the pins because they are published
+      # without repo access; this catches a release shipping one native version on one
+      # channel and another elsewhere. Needs only bash/awk/sed, so it runs first and
+      # fails fast.
+      - name: Packaging pins match
+        run: bash scripts/sync_pins.sh --check
+      # pycairo (a dependency) builds from source on sync.
+      - name: Install build prerequisites
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libcairo2-dev pkg-config
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          version: "0.13.1"
+      - name: Sync (pins ruff via the dev group)
+        run: uv sync --locked
+      - name: Ruff lint
+        run: uv run ruff check .
+      # Same pinned ruff as the lint step, so format output matches exactly.
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      # Enforce the layered/acyclic module graph. Pure static import
+      # analysis (no GI/GStreamer stack needed), so it belongs in the lint job.
+      - name: Import-linter (architecture contract)
+        run: uv run lint-imports
+      # The build and vendor shell carries `# shellcheck source=` directives. Gated at
+      # warning and above: the info level objects to the literal '$ORIGIN' in the RPATH
+      # flags, which must not expand, and prefers find over ls for filenames we control.
+      - name: Shellcheck
+        run: uv run shellcheck -x --severity=warning scripts/*.sh lib/*.sh lab/*.sh packaging/pins.sh packaging/debian/.dockervalidate/*.sh packaging/aur/.dockervalidate/run.sh packaging/flatpak/.flatpakvalidate/*.sh
+
+  test:
+    name: Tests (pytest)
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The GTK4/Adw/GStreamer typelibs for the GI modules, Xvfb for the widget tests,
+      # python3-gi-cairo, without which GTK cannot hand a draw function its cairo
+      # context, and fonts-inter, whose proportional digits the tabular tests need.
+      # libcairo/pkg-config let pycairo build.
+      - name: Install GI + GStreamer stack and build prerequisites
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-gi python3-gi-cairo gir1.2-glib-2.0 gir1.2-gtk-4.0 gir1.2-adw-1 \
+            gir1.2-gstreamer-1.0 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            libcairo2-dev pkg-config xvfb xauth fonts-inter
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          version: "0.13.1"
+      # Build on the system Python (whatever python3-gi targets on this image) but
+      # keep the venv hermetic: uv manages the locked deps, and only the system `gi`
+      # package is linked in. --system-site-packages would expose every system
+      # package, whose pytest plugins then load against the venv's own dependencies.
+      - name: Create venv
+        run: uv venv --python /usr/bin/python3
+      # The icons group lets the tray tests render the shipped icons.
+      - name: Sync dependencies
+        run: uv sync --locked --group icons
+      - name: Link the system GI bindings into the venv
+        run: |
+          gi_dir=$(/usr/bin/python3 -c 'import gi, os; print(os.path.dirname(gi.__file__))')
+          site=$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))')
+          ln -s "$gi_dir" "$site/gi"
+      # The whole suite on one virtual display, so no widget test needs listing here and
+      # coverage sees every module; GTK recommends its `test` accessibility backend for
+      # CI. Coverage is enforced here, not in addopts, to keep single-file runs quick.
+      - name: Run tests
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+          GTK_A11Y: test
+        run: |
+          dbus-run-session -- xvfb-run -a bash -e <<'SH'
+          uv run --locked python - <<'PY'
+          import gi
+          gi.require_version("Gtk", "4.0")
+          from gi.repository import Gtk, Gdk
+          if Gdk.Display.get_default() is None:
+              raise SystemExit("GTK display unavailable; widget tests must run")
+          PY
+          uv run --locked pytest -ra --cov=quoth --cov-report=term-missing
+          SH
+      - name: Desktop lifecycle unit tests
+        run: uv run --locked --project lab pytest lab/test_lifecycle.py
+
+  validate-metadata:
+    name: Validate AppStream + desktop entry
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install validators
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends appstream desktop-file-utils
+      # Globbed so an app-id/file rename never needs a CI edit. --no-net: the
+      # screenshot URLs name the release tag, which a commit can precede, and a
+      # live URL check would fail CI on a warning.
+      - name: Validate AppStream metainfo
+        run: appstreamcli validate --no-net data/*.metainfo.xml
+      - name: Validate desktop entry
+        run: desktop-file-validate data/*.desktop
+
+  zizmor:
+    name: Workflow audit (zizmor)
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          version: "0.13.1"
+          # Same key inputs as the lint job, whose cache also holds the built pycairo.
+          cache-suffix: zizmor
+      # The dev group's locked zizmor, which `uv run zizmor .` runs locally. Without a
+      # token zizmor runs offline and skips its online audits; this read-only one is enough.
+      - name: zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: uv run --locked --only-group dev zizmor --persona=regular --collect=default --color=always .

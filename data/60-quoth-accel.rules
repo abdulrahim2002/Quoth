@@ -1,0 +1,4 @@
+# Quoth: let whoever is signed in at this computer's screen use accel devices,
+# the NPU among them, as systemd 260 does. Debian 13 and Ubuntu 24.04 leave
+# them to the render group.
+SUBSYSTEM=="accel", KERNEL=="accel*", TAG+="uaccess"

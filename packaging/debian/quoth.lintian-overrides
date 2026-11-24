@@ -1,0 +1,11 @@
+# The rule gives the seat user /dev/uinput for ydotool's paste chord. uinput is a
+# virtual device with no modalias for AppStream to announce.
+quoth: appstream-metadata-missing-modalias-provide usr/lib/udev/rules.d/60-quoth-uinput.rules
+
+# The rule gives the seat user every accel node, the NPU's included. It matches a
+# subsystem, not one device, so AppStream has no modalias to announce.
+quoth: appstream-metadata-missing-modalias-provide usr/lib/udev/rules.d/60-quoth-accel.rules
+
+# A desktop application started from its launcher; quoth --help documents the few
+# command-line options.
+quoth: no-manual-page [usr/bin/quoth]

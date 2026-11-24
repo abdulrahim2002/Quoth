@@ -1,0 +1,77 @@
+name: Dependency audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+# Only pull requests cancel a run in progress; on main a newer run waits for it.
+concurrency:
+  group: dependency-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Pull requests always run on GitHub-hosted runners. Other events use the runner the
+# TRUSTED_RUNNER variable names, or ubuntu-24.04 when it is unset.
+jobs:
+  python-audit:
+    name: Audit locked Python dependencies
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.1"
+      - name: Audit application and tooling lock
+        run: uv audit --locked 2>&1 | tee "$RUNNER_TEMP/uv-audit-root.log"
+      - name: Audit desktop lab lock
+        if: ${{ !cancelled() }}
+        run: uv audit --locked --project lab 2>&1 | tee "$RUNNER_TEMP/uv-audit-lab.log"
+      - name: Render and lock the Flatpak wheel graph
+        if: ${{ !cancelled() }}
+        run: |
+          audit_dir="$RUNNER_TEMP/flatpak-python-audit"
+          uv run --locked --only-group dev python scripts/render_flatpak_audit_project.py \
+            packaging/flatpak/python3-build-deps.yaml \
+            packaging/flatpak/python3-deps.yaml \
+            --output-dir "$audit_dir"
+          uv lock --python "$(cat "$audit_dir/.python-version")" --directory "$audit_dir" \
+            2>&1 | tee "$RUNNER_TEMP/uv-lock-flatpak.log"
+      - name: Audit the locked Flatpak wheel graph
+        if: ${{ !cancelled() }}
+        run: |
+          audit_dir="$RUNNER_TEMP/flatpak-python-audit"
+          uv audit --locked --python-version "$(cat "$audit_dir/.python-version")" \
+            --python-platform linux \
+            --project "$audit_dir" 2>&1 | tee "$RUNNER_TEMP/uv-audit-flatpak.log"
+      # The logs only help read a result, so an upload failure must not fail an audit.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        continue-on-error: true
+        with:
+          name: python-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/uv-audit-root.log
+            ${{ runner.temp }}/uv-audit-lab.log
+            ${{ runner.temp }}/uv-lock-flatpak.log
+            ${{ runner.temp }}/uv-audit-flatpak.log
+            ${{ runner.temp }}/flatpak-python-audit/.python-version
+            ${{ runner.temp }}/flatpak-python-audit/flatpak-wheel-inputs.json
+            ${{ runner.temp }}/flatpak-python-audit/pyproject.toml
+            ${{ runner.temp }}/flatpak-python-audit/uv.lock
+            packaging/flatpak/python3-build-deps.yaml
+            packaging/flatpak/python3-deps.yaml
+          retention-days: 14

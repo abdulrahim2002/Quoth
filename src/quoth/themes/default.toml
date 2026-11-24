@@ -1,0 +1,43 @@
+# Quoth default theme: the built-in flat look, written out as a reference.
+schema = 1
+
+[meta]
+name        = "Default"
+author      = "Quoth"
+description = "The built-in flat look: bone on ink, red reserved for errors."
+
+[colors]
+background       = "#0E0E11D9" # Ink
+border           = "#F2F0EA1A" # Bone
+accent           = "#F2F0EAE5" # Bone
+text             = "#F2F0EAE5" # Bone
+dot_recording    = "#F2F0EA"   # Bone
+dot_transcribing = "#F2F0EA"   # Bone
+dot_error        = "#CC2936"   # Tomato Jam
+
+[geometry]
+width        = 240
+height       = 48
+border_width = 1.0
+bar_gap      = 3
+line_width   = 1.5
+
+[position]
+anchor = "bottom-center"
+margin = 60
+
+[font]
+family = "sans-serif"
+size   = 12
+
+[animation]
+enabled        = true
+duration_scale = 1.0
+
+[animation.entry]
+duration = 0.09
+easing   = "ease-out-cubic"
+
+[animation.exit]
+duration = 0.15
+easing   = "ease-in-cubic"

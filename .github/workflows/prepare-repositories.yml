@@ -1,0 +1,177 @@
+name: Prepare package repositories
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_run_id:
+        description: Completed manual package run with passing source and install checks
+        type: string
+        required: true
+      target:
+        description: Rehearse with a disposable key, or sign for packages.quoth.dev
+        type: choice
+        options: [rehearsal, production]
+        default: rehearsal
+
+permissions:
+  contents: read
+  actions: read # reads the selected package run and downloads its artifacts
+
+# A second dispatch queues rather than cancel one waiting for release approval.
+concurrency:
+  group: prepare-repositories-${{ github.ref }}
+  cancel-in-progress: false
+
+# The rehearsal job runs on the runner the TRUSTED_RUNNER variable names, or on
+# ubuntu-24.04 when it is unset; production always runs on ubuntu-24.04. Steps
+# gated on runner.environment set up a hosted runner.
+jobs:
+  rehearsal:
+    name: Prepare with a disposable key
+    if: inputs.target != 'production'
+    runs-on: ${{ vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    env:
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify selected package run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/check_package_run.py --repository "$GITHUB_REPOSITORY" \
+            --run-id "$PACKAGE_RUN_ID" --source-commit "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/package-run.json" --artifacts "$RUNNER_TEMP/artifacts"
+      - name: Install repository tools
+        if: runner.environment == 'github-hosted'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg flatpak ostree
+      - name: Prepare with a disposable key
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+        run: |
+          install -d -m 700 "$GNUPGHOME"
+          gpg --batch --passphrase '' --quick-generate-key \
+            'Quoth private repository rehearsal' ed25519 sign 1d
+          fingerprint=$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')
+          python3 scripts/prepare_repositories.py \
+            --artifacts "$RUNNER_TEMP/artifacts" --output "$RUNNER_TEMP/site" \
+            --base-url https://example.invalid/quoth --signing-key "$fingerprint"
+          printf '%s\n' 'PRIVATE REHEARSAL: disposable key and inactive URLs. Do not publish this tree.' \
+            > "$RUNNER_TEMP/PRIVATE-REHEARSAL.txt"
+      - name: Verify repository signatures
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+        run: bash scripts/check_repository_signatures.sh "$RUNNER_TEMP/site" "$RUNNER_TEMP/client"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: private-repositories-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/site/
+            ${{ runner.temp }}/package-run.json
+            ${{ runner.temp }}/PRIVATE-REHEARSAL.txt
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Retire disposable signing key
+        if: always()
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+        run: |
+          if [ -d "$GNUPGHOME" ]; then
+            fingerprint=$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')
+            if [ -n "$fingerprint" ]; then
+              gpg --batch --yes --delete-secret-and-public-key "$fingerprint"
+            fi
+            gpgconf --kill gpg-agent
+            rm -rf -- "$GNUPGHOME"
+          fi
+
+  # The production key reaches only this job, after the release environment's
+  # approval, and only on a GitHub-hosted runner.
+  production:
+    name: Sign for packages.quoth.dev
+    if: inputs.target == 'production'
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 15
+    env:
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify selected package run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/check_package_run.py --repository "$GITHUB_REPOSITORY" \
+            --run-id "$PACKAGE_RUN_ID" --source-commit "$GITHUB_SHA" \
+            --output "$RUNNER_TEMP/package-run.json" --artifacts "$RUNNER_TEMP/artifacts"
+          test "$(jq -r '.target' "$RUNNER_TEMP/artifacts/deb/release-metadata.json")" = production || {
+            echo 'The production key signs only a production package run.' >&2
+            exit 1
+          }
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg flatpak ostree
+      - name: Fetch the published site
+        run: |
+          # The Pages branch holds the previous complete site; only the first
+          # publication has none. Preparation checks its signed manifest first.
+          status=0
+          git ls-remote --exit-code --heads origin gh-pages > /dev/null || status=$?
+          if [ "$status" = 0 ]; then
+            git fetch --depth=1 origin gh-pages
+            git archive --output="$RUNNER_TEMP/previous-site.tar" FETCH_HEAD
+            mkdir "$RUNNER_TEMP/previous-site"
+            tar -xf "$RUNNER_TEMP/previous-site.tar" -C "$RUNNER_TEMP/previous-site"
+          elif [ "$status" != 2 ]; then
+            exit "$status"
+          fi
+      - name: Import the signing key
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+          SIGNING_KEY: ${{ secrets.REPOSITORY_SIGNING_KEY }}
+        run: |
+          install -d -m 700 "$GNUPGHOME"
+          printf '%s\n' "$SIGNING_KEY" | gpg --batch --import
+      - name: Prepare for packages.quoth.dev
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+          SIGNING_FINGERPRINT: ${{ vars.REPOSITORY_SIGNING_FINGERPRINT }}
+        run: |
+          previous=()
+          if [ -d "$RUNNER_TEMP/previous-site" ]; then
+            previous=(--previous-site "$RUNNER_TEMP/previous-site")
+          fi
+          python3 scripts/prepare_repositories.py \
+            --artifacts "$RUNNER_TEMP/artifacts" --output "$RUNNER_TEMP/site" \
+            --base-url https://packages.quoth.dev --pages-domain packages.quoth.dev \
+            --signing-key "$SIGNING_FINGERPRINT" "${previous[@]}"
+      - name: Verify repository signatures
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+        run: bash scripts/check_repository_signatures.sh "$RUNNER_TEMP/site" "$RUNNER_TEMP/client"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: repositories-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/site/
+            ${{ runner.temp }}/package-run.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+      - name: Remove the signing keyring
+        if: always()
+        env:
+          GNUPGHOME: ${{ runner.temp }}/quoth-signing
+        run: |
+          if [ -d "$GNUPGHOME" ]; then
+            gpgconf --kill gpg-agent
+            rm -rf -- "$GNUPGHOME"
+          fi

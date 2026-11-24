@@ -1,0 +1,26 @@
+# Nord (https://nordtheme.com): Snow Storm by day, Polar Night by night.
+kind = "skin"
+schema = 1
+
+[meta]
+name        = "Nord"
+author      = "Quoth (port of Nord by Sven Greb)"
+description = "Arctic, north-bluish surfaces with a frost accent."
+
+[light]
+window    = "#E5E9F0" # Snow Storm nord5
+view      = "#ECEFF4" # Snow Storm nord6
+card      = "#ECEFF4" # Snow Storm nord6
+popover   = "#ECEFF4" # Snow Storm nord6
+text      = "#2E3440" # Polar Night nord0
+accent    = "#88C0D0" # Frost nord8
+on_accent = "#2E3440" # Polar Night nord0
+
+[dark]
+window    = "#2E3440" # Polar Night nord0
+view      = "#3B4252" # Polar Night nord1
+card      = "#3B4252" # Polar Night nord1
+popover   = "#3B4252" # Polar Night nord1
+text      = "#ECEFF4" # Snow Storm nord6
+accent    = "#88C0D0" # Frost nord8
+on_accent = "#2E3440" # Polar Night nord0

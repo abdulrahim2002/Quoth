@@ -1,0 +1,194 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: quoth
+Upstream-Contact: Samuel Ruairí Bullard <samuel.ruairi.bullard@gmail.com>
+Source: https://github.com/abullard1/Quoth
+Comment: The binary package bundles seven native components added at package
+ time (not present in this source tree): whisper.cpp (libwhisper.so + ggml
+ backends, MIT; it compiles in YaRN under MIT and Vulkan-Hpp, used under MIT),
+ the trimmed Intel-NPU OpenVINO runtime (Apache-2.0, with oneTBB under
+ Apache-2.0 and hwloc under BSD-3-Clause), Intel's prebuilt NPU driver stack
+ (the user-mode driver, MIT; its compiler, Apache-2.0, compiling in LLVM and
+ MLIR under Apache-2.0 WITH LLVM-exception, the legacy NCSA licence and
+ BSD-2-Clause, BSD-3-Clause, Spencer and Unicode notices; the Level Zero
+ loader, MIT), gtk4-layer-shell (MIT), ThorVG (MIT; it compiles in RapidJSON
+ under MIT and code under the FreeType License and MPL-2.0), wl-clipboard's
+ wl-copy and wl-paste (GPL-3.0-or-later), and ydotool's ydotool and ydotoold
+ (AGPL-3.0-or-later). gtk4-layer-shell and wl-clipboard also compile in code
+ generated from Wayland protocols under MIT and HPND-sell-variant terms.
+ wl-clipboard, Copyright 2018-2026 Sergey Bugaev, and ydotool, Copyright
+ 2018-2022 Reimu NotMoe, are built unmodified from
+ https://github.com/bugaevc/wl-clipboard and
+ https://github.com/ReimuNotMoe/ydotool. packaging/pins.sh names each one's
+ tag, commit or checksum; it is in quoth-VERSION.tar.gz on each release at
+ https://github.com/abullard1/Quoth/releases, where quoth-deb-sources.tar.gz
+ holds the unmodified source of wl-clipboard, ydotool and ThorVG at those
+ commits, and the build distribution's wayland-protocols files that
+ wl-clipboard generates code from, with that package's version. It also bundles
+ the pure-Python Sentry SDK (MIT) privately under
+ .../dist-packages/quoth/_vendor/, five Lucide icons (ISC), three adapted
+ palettes (MIT upstream, GPL-3.0-or-later adaptation), and the Silero VAD model
+ in whisper.cpp's GGML format (MIT). Each ships its own license text beside the
+ bundled files or under /usr/share/licenses/quoth/.
+
+Files: *
+Copyright: 2026 Samuel Ruairí Bullard
+License: GPL-3.0-or-later
+
+Files: CODE_OF_CONDUCT.md
+Copyright: Organization for Ethical Source
+License: CC-BY-SA-4.0
+Comment: Adapted from the Contributor Covenant, version 3.0.
+
+Files: data/icons/hicolor/symbolic/apps/dev.quoth.Quoth-bug-symbolic.svg
+ data/icons/hicolor/symbolic/apps/dev.quoth.Quoth-coffee-symbolic.svg
+ data/icons/hicolor/symbolic/apps/dev.quoth.Quoth-gauge-symbolic.svg
+ data/icons/hicolor/symbolic/apps/dev.quoth.Quoth-github-symbolic.svg
+ data/icons/hicolor/symbolic/apps/dev.quoth.Quoth-heart-symbolic.svg
+Copyright: 2026 Lucide Icons and Contributors
+License: ISC
+
+Files: src/quoth/weights/* data/licenses/LICENSE.silero-vad
+Copyright: 2020-present Silero Team
+License: MIT
+Comment: whisper.cpp's GGML conversion of the Silero VAD model. The upstream
+ notice is installed as /usr/share/licenses/quoth/LICENSE.silero-vad.
+
+Files: tests/fixtures/whisper-cpu-feats-v1.9.5.cpp
+Copyright: 2023-2026 The ggml authors
+License: MIT
+Comment: An unmodified whisper.cpp source file used only by the test suite.
+
+Files: packaging/patches/*
+Copyright: 2023-2026 The ggml authors
+ 2026 Samuel Ruairí Bullard
+License: MIT
+Comment: Patches to whisper.cpp, applied at build time; they carry whisper.cpp
+ source as context and take its licence.
+
+Files: packaging/flatpak/pygobject-transfer-full.patch
+Copyright: The PyGObject authors
+ 2026 Samuel Ruairí Bullard
+License: LGPL-2.1-or-later
+Comment: A patch to PyGObject, which the Flatpak builds and bundles; it carries
+ PyGObject source as context and takes its licence.
+
+Files: data/licenses/LICENSE.loguru
+Copyright: 2017
+License: MIT
+
+Files: data/licenses/LICENSE.catppuccin
+Copyright: 2021 Catppuccin
+License: MIT
+
+Files: src/quoth/themes/catppuccin-mocha.toml src/quoth/skins/catppuccin.toml
+Copyright: 2021 Catppuccin
+ 2026 Samuel Ruairí Bullard
+License: MIT and GPL-3.0-or-later
+Comment: The Catppuccin palette is licensed under MIT. The Quoth TOML adaptations
+ are licensed under GPL-3.0-or-later. The canonical upstream notice is installed
+ as /usr/share/licenses/quoth/LICENSE.catppuccin.
+
+Files: data/licenses/LICENSE.dracula
+Copyright: 2023 Dracula Theme
+License: MIT
+
+Files: src/quoth/themes/dracula.toml src/quoth/skins/dracula.toml
+Copyright: 2023 Dracula Theme
+ 2026 Samuel Ruairí Bullard
+License: MIT and GPL-3.0-or-later
+Comment: The Dracula and Alucard palettes are licensed under MIT. The Quoth TOML
+ adaptations are licensed under GPL-3.0-or-later. The canonical upstream notice
+ is installed as /usr/share/licenses/quoth/LICENSE.dracula.
+
+Files: data/licenses/LICENSE.nord
+Copyright: 2016-present Sven Greb <development@svengreb.de>
+License: MIT
+
+Files: src/quoth/themes/nord.toml src/quoth/skins/nord.toml
+Copyright: 2016-present Sven Greb <development@svengreb.de>
+ 2026 Samuel Ruairí Bullard
+License: MIT and GPL-3.0-or-later
+Comment: The Nord palette is licensed under MIT. The Quoth TOML adaptations are
+ licensed under GPL-3.0-or-later. The canonical upstream notice is installed as
+ /usr/share/licenses/quoth/LICENSE.nord.
+
+Files: packaging/aur/PKGBUILD packaging/aur/.SRCINFO packaging/aur/quoth.install
+ packaging/aur/LICENSE packaging/aur/quoth-git/*
+Copyright: 2026 Samuel Ruairí Bullard
+License: 0BSD
+Comment: The Arch package recipes, written for the AUR's package repositories.
+
+License: GPL-3.0-or-later
+ This program is free software: you can redistribute it and/or modify it under
+ the terms of the GNU General Public License as published by the Free Software
+ Foundation, either version 3 of the License, or (at your option) any later
+ version.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT ANY
+ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ .
+ On Debian systems, the complete text of the GNU General Public License version 3
+ can be found in "/usr/share/common-licenses/GPL-3".
+
+License: Apache-2.0
+ Bundled OpenVINO runtime and Intel NPU compiler (Intel-NPU encoder offload).
+ Licensed under the Apache License, Version 2.0. On Debian systems the full text
+ is in "/usr/share/common-licenses/Apache-2.0"; the upstream notices and licenses
+ also ship under .../quoth/lib/openvino/licenses/ and .../quoth/lib/npu/licenses/.
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+License: ISC
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted, provided that the above
+ copyright notice and this permission notice appear in all copies.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+License: LGPL-2.1-or-later
+ This library is free software; you can redistribute it and/or modify it under
+ the terms of the GNU Lesser General Public License as published by the Free
+ Software Foundation; either version 2.1 of the License, or (at your option) any
+ later version.
+ .
+ On Debian systems, the complete text of the GNU Lesser General Public License
+ version 2.1 can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+License: CC-BY-SA-4.0
+ Creative Commons Attribution-ShareAlike 4.0 International. The full text is at
+ https://creativecommons.org/licenses/by-sa/4.0/legalcode.
+
+License: 0BSD
+ Permission to use, copy, modify, and/or distribute this software for
+ any purpose with or without fee is hereby granted.
+ .
+ THE SOFTWARE IS PROVIDED “AS IS” AND THE AUTHOR DISCLAIMS ALL
+ WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+ FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+ DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.

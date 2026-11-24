@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Samuel Ruairí Bullard -->
+<!-- The single source of Quoth's settings: names, types, defaults and valid values. -->
+<schemalist>
+  <schema id="dev.quoth.Quoth" path="/dev/quoth/Quoth/">
+
+    <key name="mode" type="s">
+      <choices>
+        <choice value="tap-to-toggle"/>
+        <choice value="push-to-hold"/>
+      </choices>
+      <default>'tap-to-toggle'</default>
+      <summary>Dictation key behavior</summary>
+      <description>"tap-to-toggle" starts and stops recording with one press each; "push-to-hold" records while the key is held.</description>
+    </key>
+
+    <key name="hotkey" type="s">
+      <!-- The listener reads evdev passively and the key still reaches the focused
+           app, so the default is an inert key: Pause is unbound on GNOME, KDE and COSMIC. -->
+      <default>'KEY_PAUSE'</default>
+      <summary>Native dictation key</summary>
+      <description>The evdev key name that triggers dictation outside Flatpak.</description>
+    </key>
+
+    <key name="portal-shortcut-enabled" type="b">
+      <default>false</default>
+      <summary>Desktop-managed shortcut approved</summary>
+      <description>Re-register the approved GlobalShortcuts portal shortcut when the app restarts (Flatpak).</description>
+    </key>
+
+    <key name="language" type="s">
+      <choices>
+        <choice value="auto"/>
+        <choice value="en"/>
+        <choice value="de"/>
+        <choice value="es"/>
+        <choice value="fr"/>
+        <choice value="it"/>
+        <choice value="pt"/>
+        <choice value="zh"/>
+        <choice value="ja"/>
+        <choice value="ko"/>
+        <choice value="ru"/>
+        <choice value="ar"/>
+        <choice value="hi"/>
+        <choice value="nl"/>
+        <choice value="pl"/>
+        <choice value="tr"/>
+        <choice value="sv"/>
+        <choice value="no"/>
+        <choice value="da"/>
+        <choice value="fi"/>
+      </choices>
+      <default>'en'</default>
+      <summary>Dictation language</summary>
+      <description>The spoken language, or "auto" to detect it. First run seeds it from the system locale.</description>
+    </key>
+
+    <key name="translate" type="b">
+      <default>false</default>
+      <summary>Translate to English</summary>
+      <description>Transcribe speech in any language as English text.</description>
+    </key>
+
+    <key name="model" type="s">
+      <choices>
+        <choice value="tiny"/>
+        <choice value="base"/>
+        <choice value="small"/>
+        <choice value="large-v3-turbo"/>
+      </choices>
+      <default>'base'</default>
+      <summary>Speech model</summary>
+      <description>The whisper model used for transcription. Larger models are more accurate, slower and bigger to download.</description>
+    </key>
+
+    <key name="device" type="s">
+      <choices>
+        <choice value="auto"/>
+        <choice value="NPU"/>
+        <choice value="GPU"/>
+        <choice value="CPU"/>
+      </choices>
+      <default>'auto'</default>
+      <summary>Acceleration device</summary>
+      <description>Where transcription runs; "auto" picks the fastest measured device for the model.</description>
+    </key>
+
+    <key name="mic-source" type="s">
+      <default>'auto'</default>
+      <summary>Microphone</summary>
+      <description>The capture device, or "auto" for the system default.</description>
+    </key>
+
+    <key name="vad" type="b">
+      <!-- No Settings row: not a question a user can answer. -->
+      <default>true</default>
+      <summary>Trim silence before transcribing</summary>
+      <description>Use whisper.cpp's voice activity detection to drop silence, which otherwise transcribes as words such as "you". A buffer judged silent is retried untrimmed when it was loud.</description>
+    </key>
+
+    <key name="launch-at-login" type="b">
+      <default>true</default>
+      <summary>Launch at login</summary>
+      <description>Start Quoth in the background when you log in.</description>
+    </key>
+
+    <key name="keep-warm" type="b">
+      <default>true</default>
+      <summary>Keep the model loaded</summary>
+      <description>Keep the model in memory between dictations for a faster response.</description>
+    </key>
+
+    <key name="keep-warm-timeout" type="u">
+      <range min="30" max="1800"/>
+      <default>300</default>
+      <summary>Unload after (seconds)</summary>
+      <description>Idle seconds before the loaded model is freed.</description>
+    </key>
+
+    <key name="sound-feedback" type="s">
+      <choices>
+        <choice value="auto"/>
+        <choice value="on"/>
+        <choice value="off"/>
+      </choices>
+      <default>'auto'</default>
+      <summary>Sound cues</summary>
+      <description>Play recording cues; "auto" plays them when there is no on-screen overlay.</description>
+    </key>
+
+    <key name="notification-feedback" type="s">
+      <choices>
+        <choice value="auto"/>
+        <choice value="on"/>
+        <choice value="off"/>
+      </choices>
+      <default>'auto'</default>
+      <summary>Notification cues</summary>
+      <description>Show recording notifications; "auto" shows them when there is no on-screen overlay.</description>
+    </key>
+
+    <key name="sound-volume" type="u">
+      <range min="0" max="100"/>
+      <default>70</default>
+      <summary>Sound volume</summary>
+      <description>Loudness of the recording cues, from 0 to 100.</description>
+    </key>
+
+    <key name="notify-updates" type="b">
+      <default>false</default>
+      <summary>Check for updates</summary>
+      <description>Check the latest release at startup and notify. Nothing is downloaded or installed.</description>
+    </key>
+
+    <key name="crash-reports" type="b">
+      <default>false</default>
+      <summary>Send error reports</summary>
+      <description>Send technical details about errors and crashes to Sentry (EU). Never audio or dictated text.</description>
+    </key>
+
+    <key name="onboarding-complete" type="b">
+      <default>false</default>
+      <summary>First-run setup finished</summary>
+      <description>Set when onboarding completes, so it is shown only once.</description>
+    </key>
+
+    <key name="calibration-offered" type="b">
+      <default>false</default>
+      <summary>Benchmark offered</summary>
+      <description>Set once the device benchmark has been offered, so the offer is shown only once.</description>
+    </key>
+
+    <key name="overlay-style" type="s">
+      <choices>
+        <choice value="pill"/>
+        <choice value="orb"/>
+      </choices>
+      <default>'pill'</default>
+      <summary>Overlay style</summary>
+      <description>The recording overlay: the "pill" or the experimental audio-reactive "orb".</description>
+    </key>
+
+  </schema>
+</schemalist>

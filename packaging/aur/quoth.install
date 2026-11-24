@@ -1,0 +1,43 @@
+# Quoth post-install: applies the udev rules and prints a welcome, how to start
+# Quoth and how to turn the uinput rule off; an upgrade prints one line.
+# Never changes group membership (there is no reliable target user at root-run
+# install time).
+
+post_install() {
+  # Apply the udev rules now, not at the next boot. Each step fails harmlessly
+  # where udev is absent, as in a container.
+  udevadm control --reload-rules || true
+  modprobe uinput || true
+  udevadm trigger --sysname-match=uinput || true
+  udevadm trigger --subsystem-match=accel || true
+
+  # The package's own version, which pacman passes as [epoch:]pkgver-pkgrel;
+  # only pkgver.
+  version=${1#*:}
+  version=${version%-*}
+
+  # pacman reads a scriptlet's output from a socket, never a terminal, so this
+  # is the .deb's welcome in its plain form. A failed print cannot fail the install.
+  cat <<EOF || true
+
+  Quoth${version:+ $version}  -  Local. Private. Yours.
+  Offline voice dictation. Press a key, speak, the text lands at your cursor.
+
+  Start     open Quoth from your app launcher, or run quoth
+  Website   quoth.dev
+  Source    github.com/abullard1/Quoth
+  Made by   Samuel Ruairí Bullard
+
+  On a computer shared with people you do not trust: Quoth's udev rule lets
+  whoever is signed in at this computer's screen send keystrokes, even into a
+  later session. To turn it off, run this, then reboot:
+  sudo ln -sf /dev/null /etc/udev/rules.d/60-quoth-uinput.rules
+
+EOF
+}
+
+post_upgrade() {
+  # Nothing restarts a running Quoth, which keeps the old version until it is
+  # reopened. The subshell keeps a broken pipe from killing the script.
+  (echo "==> Quoth installed. If it is running, quit and reopen it to use this version.") || true
+}

@@ -1,0 +1,91 @@
+#!/bin/sh
+# Quoth post-install: applies the udev rules and prints a welcome, how to start
+# Quoth and how to turn the uinput rule off; an upgrade prints one line.
+# No group change (no reliable target user at install time) and no daemon
+# management (Quoth starts ydotoold itself where no service runs).
+set -e
+
+case "$1" in
+  configure)
+    # An upgrade passes the previously configured version; only a first install has none.
+    if [ -z "$2" ]; then
+      # Apply the udev rules now, not at the next boot. Each step fails harmlessly
+      # where udev is absent, as in a container.
+      udevadm control --reload-rules || true
+      modprobe uinput || true
+      udevadm trigger --sysname-match=uinput || true
+      udevadm trigger --subsystem-match=accel || true
+
+      # The package's own version, which dpkg already records while configuring
+      # it; only the upstream part, without an epoch or a Debian revision.
+      version=$(dpkg-query -W -f='${Version}' quoth 2>/dev/null) || version=''
+      version=${version#*:}
+      version=${version%-*}
+
+      # One subshell under || true, so a failed print (closed stdout, gone reader
+      # or terminal) cannot fail the install.
+      (
+        # The art and styling need UTF-8, a TERM that draws them (not dumb, not the
+        # text console) and a width that fits the art. stty reads none off a
+        # terminal, and 0 on the one apt gives dpkg when piped: both mean plain.
+        rich=
+        if [ -n "${TERM:-}" ] && [ "$TERM" != dumb ] && [ "$TERM" != linux ] &&
+          [ "$(locale charmap 2>/dev/null)" = UTF-8 ]; then
+          { size=$(stty size <&3 2>/dev/null); } 3>&1
+          # 59 columns, the widest art line.
+          if [ "${size#* }" -ge 59 ] 2>/dev/null; then
+            rich=1
+          fi
+        fi
+        if [ -n "$rich" ]; then
+          b=$(printf '\033[1m') f=$(printf '\033[2m') r=$(printf '\033[0m')
+          cat <<EOF
+
+${b}     ▄▟██████▄▖                                  ▄▄▄       ${r}
+${b}   ▄██▛▀▀▀▀▀▀██▙▖                          ██▙   ███       ${r}
+${b}  ▐██▘        ▜██▖ ▄▄▄    ▗▄▄▖  ▗▄▄▄▄▄▄  ▗▄███▄▄ ███▗▄▄▄▄▄ ${r}
+${b}  ██▌  ▗▄▄▄    ██▌ ███    ▐██▌ ▟██▀▀▀▜██▄▝▀███▀▀ ███▛▀▀▀██▙${r}
+${b}  ██▙   ▝██▙   ██▌ ███    ▐██▌▐██▌    ▜██▖ ███   ███    ███${r}
+${b}  ▝██▄   ███▖ ▟█▛  ███    ▐██▌▐██▖    ▐██▌ ███   ███    ▐██${r}
+${b}   ▝▜██▙▄▝███▙▞▀   ▜██▄  ▗███▌▝██▙▖  ▗██▛  ███   ███    ▐██${r}
+${b}     ▝▀▜██▄▝▀▀▜█▙▖  ▀████▛▐██▘  ▀█████▛▀   ▀████ ██▛    ▐██${r}
+${f}    ▄▄▟█▛▜▙▄████▘  ▗██▛▀▀▜▟██▌ ▄▟█▀▀▀▜█▙▄  ▟██▀▀ ███    ▐██${r}
+${f}  ⣴⣿⡿⠉  ⢀⣿⣿⡿⠁ ⠙⣿⣷⡄ ⣿⣿⣿    ⢸⣿⣿⡇⢸⣿⣿⡅    ⣸⣿⣿⠇ ⣿⣿⣿   ⣿⣿⣿    ⣼⣿⣿${r}
+${f}  ⢑⢕⢅   ⠁⠁⠁   ⢀⢕⢕⠅ ⠕⠕⠕    ⠐⠕⠕⠅ ⠑⠑⠕⠔⠔⠔⠔⠕⠑⠁⠐⠔⢕⢕⢕⠔⠔ ⢕⢕⢕⠑⠔⠔⠔⠕⠕⠁${r}
+${f}   ⠁⠁⠁⠁      ⠁⠁⠁⠁                          ⠁⠁⠁   ⠁⠁⠁       ${r}
+
+${b}  Quoth${r}${version:+${f} $version${r}}${f}  ·  ${r}Local. Private. Yours.
+EOF
+        else
+          b='' f='' r=''
+          cat <<EOF
+
+  Quoth${version:+ $version}  -  Local. Private. Yours.
+EOF
+        fi
+        cat <<EOF
+${f}  Offline voice dictation. Press a key, speak, the text lands at your cursor.${r}
+
+${f}  Start     ${r}open Quoth from your app launcher, or run ${b}quoth${r}
+${f}  Website   ${r}quoth.dev
+${f}  Source    ${r}github.com/abullard1/Quoth
+${f}  Made by   ${r}Samuel Ruairí Bullard
+
+${f}  On a computer shared with people you do not trust: Quoth's udev rule lets${r}
+${f}  whoever is signed in at this computer's screen send keystrokes, even into a${r}
+${f}  later session. To turn it off, run this, then reboot:${r}
+${f}  sudo ln -sf /dev/null /etc/udev/rules.d/60-quoth-uinput.rules${r}
+
+EOF
+      ) || true
+    else
+      # Nothing restarts a running Quoth, which keeps the old version until it is
+      # reopened. The subshell keeps a broken pipe from killing the script.
+      (echo "==> Quoth installed. If it is running, quit and reopen it to use this version.") || true
+    fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

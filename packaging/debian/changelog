@@ -1,0 +1,10 @@
+quoth (0.1.0) unstable; urgency=medium
+
+  * Initial .deb packaging. Wraps the shared Makefile engine: Vulkan
+    whisper.cpp + C shim, the trimmed Intel-NPU OpenVINO encoder runtime with
+    the Intel NPU UMD, compiler and Level Zero loader, and bundled copies of
+    gtk4-layer-shell for the overlay, wl-clipboard and ydotool for the paste,
+    ThorVG for onboarding's animations and the Sentry SDK for opt-in error
+    reports.
+
+ -- Samuel Ruairí Bullard <samuel.ruairi.bullard@gmail.com>  Tue, 24 Nov 2026 00:00:00 +0000

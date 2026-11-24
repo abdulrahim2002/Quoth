@@ -1,0 +1,97 @@
+#!/usr/bin/make -f
+# Quoth .deb: a thin wrapper over the shared Makefile engine. pybuild builds and
+# installs the Python wheel; the Makefile builds the native libs and stages all
+# data/libs. Pinned native sources are pre-fetched by
+# packaging/debian/.dockervalidate/run.sh into packaging/debian/.build-src/ so this
+# stays network-free.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+BUILD_SRC          := $(CURDIR)/packaging/debian/.build-src
+WHISPER_DIR        ?= $(BUILD_SRC)/whisper.cpp
+OPENVINO_WHEEL_DIR ?= $(BUILD_SRC)/openvino-wheel
+NPU_DRIVER_SRC     ?= $(BUILD_SRC)/npu-driver
+LAYER_SHELL_SRC    ?= $(BUILD_SRC)/gtk4-layer-shell
+THORVG_SRC         ?= $(BUILD_SRC)/thorvg
+WL_CLIPBOARD_SRC   ?= $(BUILD_SRC)/wl-clipboard
+YDOTOOL_SRC        ?= $(BUILD_SRC)/ydotool
+SENTRY_WHEEL_DIR   ?= $(BUILD_SRC)/sentry-sdk-wheel
+
+UPSTREAM_VERSION  := $(shell dpkg-parsechangelog -SVersion | sed 's/-[^-]*$$//')
+QUOTH_RELEASE      ?= quoth@$(UPSTREAM_VERSION)
+QUOTH_ENVIRONMENT  ?= production
+
+DESTROOT := $(CURDIR)/debian/quoth
+# Our wheel is py3-none-any (pure Python; the bundled .so are ctypes/GI-loaded data,
+# NOT Python extension modules), so it belongs in the UNVERSIONED dist-packages,
+# which every system python3.x scans. That lets ONE .deb work across python
+# 3.12/3.13/3.14 (Ubuntu 24.04, Debian 13, Ubuntu 26.04). pybuild installs arch
+# packages to the versioned dir by default, so execute_after_dh_auto_install
+# relocates to the unversioned path and install-data co-locates quoth/lib/ there.
+PYSITE := /usr/lib/python3/dist-packages
+
+%:
+	dh $@ --buildsystem=pybuild
+
+# Native libs: Vulkan libwhisper + C shim, the trimmed NPU OpenVINO runtime and Intel's
+# NPU driver stack, the bundled gtk4-layer-shell and thorvg, wl-clipboard and ydotool
+# (built after pybuild produces the wheel).
+execute_after_dh_auto_build:
+	$(MAKE) build WHISPER_DIR="$(WHISPER_DIR)" \
+	  WITH_OPENVINO=ON OpenVINO_DIR="$(OPENVINO_WHEEL_DIR)/openvino/cmake"
+	$(MAKE) vendor-openvino OPENVINO_WHEEL_DIR="$(OPENVINO_WHEEL_DIR)"
+	$(MAKE) vendor-npu-driver NPU_DRIVER_SRC="$(NPU_DRIVER_SRC)"
+	$(MAKE) vendor-layer-shell LAYER_SHELL_SRC="$(LAYER_SHELL_SRC)"
+	$(MAKE) vendor-thorvg THORVG_SRC="$(THORVG_SRC)"
+	$(MAKE) vendor-wl-clipboard WL_CLIPBOARD_SRC="$(WL_CLIPBOARD_SRC)"
+	$(MAKE) vendor-ydotool YDOTOOL_SRC="$(YDOTOOL_SRC)"
+
+# Relocate pybuild's versioned install to the unversioned dist-packages (see PYSITE
+# note above, one artifact across python versions), then stage desktop/icons/metainfo
+# and all bundled native libs beside it.
+execute_after_dh_auto_install:
+	set -e; \
+	for v in $(DESTROOT)/usr/lib/python3.*/dist-packages; do \
+	  [ -d "$$v" ] || continue; \
+	  mkdir -p "$(DESTROOT)$(PYSITE)"; \
+	  cp -a "$$v"/. "$(DESTROOT)$(PYSITE)"/; \
+	  rm -rf "$$v"; rmdir "$$(dirname "$$v")" 2>/dev/null || true; \
+	done
+	$(MAKE) install-data DESTDIR="$(DESTROOT)" PREFIX=/usr PYSITE="$(PYSITE)" \
+	  QUOTH_RELEASE="$(QUOTH_RELEASE)" QUOTH_ENVIRONMENT="$(QUOTH_ENVIRONMENT)" \
+	  QUOTH_CHANNEL=deb
+	set -e; \
+	vendor="$(DESTROOT)$(PYSITE)/quoth/_vendor"; \
+	install -d "$$vendor"; \
+	cp -a "$(SENTRY_WHEEL_DIR)/sentry_sdk" "$$vendor/"; \
+	license=$$(echo "$(SENTRY_WHEEL_DIR)"/sentry_sdk-*.dist-info/licenses/LICENSE); \
+	[ -f "$$license" ]; \
+	install -m644 "$$license" "$$vendor/LICENSE.sentry-sdk"
+
+# The test suite needs a GTK/GI display; skip it in the package build.
+override_dh_auto_test:
+
+# Byte-compile at install and clean up at removal. The bundled libraries keep their
+# names, since ctypes and GI load them by name, and dependencies are named in control
+# rather than guessed from the wheel, whose Sentry requirement is vendored.
+override_dh_python3:
+	dh_python3 --no-ext-rename --no-guessing-deps
+
+# Everything else is stripped into quoth-dbgsym, the NPU stack's Level Zero loader too,
+# which ships unstripped. The OpenVINO tree is Intel's prebuilt, already stripped
+# runtime, kept as the pinned wheel's bytes.
+override_dh_strip:
+	dh_strip --exclude=quoth/lib/openvino
+
+# The bundled libs are private (nothing external links them); don't publish a
+# shlibs file advertising them as a public ABI.
+override_dh_makeshlibs:
+	dh_makeshlibs -Xquoth/lib
+
+# Exclude the whole bundled tree from dependency scanning; its inter-lib NEEDEDs are
+# private ($ORIGIN-resolved). The C and C++ runtimes and the external Vulkan, GGML
+# OpenMP, Wayland client and NPU compiler runtimes are declared explicitly in control
+# (libc6, libgcc-s1, libstdc++6, libvulkan1, libgomp1, libwayland-client0, libzstd1,
+# zlib1g), rather than discovered through dpkg-shlibdeps.
+override_dh_shlibdeps:
+	dh_shlibdeps -Xquoth/lib

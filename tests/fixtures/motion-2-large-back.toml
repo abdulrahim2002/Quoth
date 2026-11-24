@@ -1,0 +1,44 @@
+# Overlay theme: import under Feedback -> Overlay theme.
+# This changes the Pill and Orb colours, independently of the app skin.
+schema = 1
+
+[meta]
+name = "Motion Lab - Large Back"
+author = "Local test"
+description = "Large Pill and larger text, with slower back-eased entry and exit."
+
+[colors]
+background = "#2B160FF2"
+border = "#FFBD694D"
+accent = "#FFB454F2"
+text = "#FFF3E4FF"
+dot_recording = "#FFB454"
+dot_transcribing = "#FFE4A1"
+dot_error = "#FF667A"
+
+[geometry]
+width = 420
+height = 80
+border_width = 1.5
+bar_gap = 4
+line_width = 2.5
+
+[position]
+anchor = "bottom-center"
+margin = 84
+
+[font]
+family = "sans-serif"
+size = 18
+
+[animation]
+enabled = true
+duration_scale = 1.25
+
+[animation.entry]
+duration = 0.6
+easing = "ease-out-back"
+
+[animation.exit]
+duration = 0.45
+easing = "ease-in-back"

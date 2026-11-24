@@ -1,0 +1,43 @@
+# Local hooks run the project's own pinned ruff (from uv.lock), so a file the hooks
+# pass also passes CI's lint and format checks. The hooks see only staged files,
+# while CI checks the whole tree. Install once:  uv run pre-commit install
+repos:
+  - repo: local
+    hooks:
+      # Lint hook runs before the formatter (ruff's recommended order).
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      # Same pinned binary and the same files as CI's Shellcheck step selects. PKGBUILDs
+      # are deliberately out: makepkg sources them with pkgver, srcdir and pkgdir
+      # already set, which shellcheck reads as undefined.
+      - id: shellcheck
+        name: shellcheck
+        entry: uv run shellcheck -x --severity=warning
+        language: system
+        files: ^((scripts|lib|lab)/[^/]+\.sh|packaging/pins\.sh|packaging/debian/\.dockervalidate/[^/]+\.sh|packaging/aur/\.dockervalidate/run\.sh|packaging/flatpak/\.flatpakvalidate/[^/]+\.sh)$
+      # Same pinned zizmor and inputs as CI's workflow audit, offline: the online audits
+      # need a GitHub token and query GitHub's current state, so CI alone runs them.
+      - id: zizmor
+        name: zizmor (workflow audit)
+        entry: uv run zizmor --offline --persona=regular --collect=default .
+        language: system
+        files: ^(\.github/.+\.ya?ml|\.pre-commit-config\.yaml)$
+        pass_filenames: false
+      # Architecture contract: needs the whole import graph, not a
+      # per-file diff, hence pass_filenames: false + always_run.
+      - id: import-linter
+        name: import-linter (architecture contract)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        always_run: true

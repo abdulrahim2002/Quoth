@@ -1,0 +1,268 @@
+[project]
+name = "quoth"
+version = "0.1.0"
+description = "Offline, private, instant voice dictation for Linux"
+readme = "README.md"
+# Classic table form (not the PEP 639 SPDX string / license-files array): the .deb
+# is built with the distro's hatchling (Ubuntu 24.04's predates PEP 639 and rejects
+# the new forms). The table is accepted by every hatchling version; LICENSE is
+# auto-included, so no license-files key is needed.
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.12"
+authors = [{ name = "Samuel Ruairí Bullard", email = "samuel.ruairi.bullard@gmail.com" }]
+keywords = [
+    "dictation", "speech-to-text", "voice", "whisper", "transcription",
+    "offline", "private", "wayland", "npu", "accessibility",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    # No per-version classifier beyond 3.12: the .deb is built with the distro's
+    # hatchling/trove-classifiers (Ubuntu 24.04's predates 3.13/3.14), which rejects
+    # classifiers it doesn't know. requires-python is the real support floor; these
+    # are cosmetic (no PyPI). Add a version only once the build distros recognise it.
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Utilities",
+    "Natural Language :: English",
+]
+# Floors are the oldest API Quoth relies on, kept low enough that the distro-shipped
+# python3-* packages satisfy them (Debian/Ubuntu system deps on the AUR/.deb
+# channels). Quoth uses only long-stable API: evdev device reads, basic loguru
+# logging, numpy frombuffer/concatenate/astype, Cairo drawing. Raise a floor only for
+# a feature that needs it.
+dependencies = [
+    "evdev>=1.6.0",
+    "loguru>=0.7.0",
+    "numpy>=1.24",
+    "pycairo>=1.20",
+    "sentry-sdk>=2.72.0",
+]
+
+[project.scripts]
+quoth = "quoth.cli:main"
+
+[project.urls]
+Homepage = "https://quoth.dev"
+Repository = "https://github.com/abullard1/Quoth"
+Issues = "https://github.com/abullard1/Quoth/issues"
+
+[build-system]
+# Ubuntu 24.04's hatchling, which builds the .deb.
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quoth"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+strict = true
+# A warning fails its test: this includes an exception raised in a worker thread or a
+# `__del__`, which pytest otherwise reports only as a warning on a passing test.
+filterwarnings = ["error"]
+# A hung test dumps every thread's stack and ends the run, rather than idling until the
+# CI job times out.
+faulthandler_timeout = 60
+faulthandler_exit_on_timeout = true
+
+[dependency-groups]
+dev = [
+    "packaging>=26.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.0",
+    "pytest-randomly>=5.0",
+    "PyYAML>=6.0.3",
+    "ruff>=0.15.17",
+    "pre-commit>=4.6",
+    "import-linter>=2.13",
+    # Ships the real shellcheck binary as a wheel, so the version is locked here
+    # rather than being whatever the CI runner image happens to carry.
+    "shellcheck-py>=0.11",
+    "zizmor>=1.31.1",
+]
+# Icon-pack regeneration (scripts/generate_icons.py), also used by the tray tests that
+# render the shipped icons; not needed by the app.
+# Run: uv run --group icons python scripts/generate_icons.py
+icons = [
+    "cairosvg>=2.9.1",
+    "pillow>=13.0",
+]
+
+[tool.coverage.run]
+source = ["quoth"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# A floor with headroom below what the whole suite covers on a display. A headless
+# run sees no widget code and falls below it.
+fail_under = 80
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# Default set (E4 import, E7 statement, E9 syntax, F pyflakes) + import sorting (I),
+# plus the high-value/low-noise tier: UP (pyupgrade: modernise to the py312 floor),
+# B (bugbear: real bugs such as mutable defaults, loop-var closures, and except
+# ordering, which matter for the evdev/GStreamer/whisper background threads),
+# RUF (ruff-native correctness, incl. stale-noqa), and NPY201 (numpy 2.x migration).
+# Line length/whitespace stay owned by `ruff format`, not the linter. D (pydocstyle,
+# Google convention plus D401's imperative mood) and W505 keep docstrings and comments
+# in one shape; whether a function needs a docstring at all stays a judgement call.
+# Four PT (flake8-pytest-style) checks keep tests specific: a broad `pytest.raises`
+# names its message, `pytest.fail` says why, and parametrize lists keep one shape.
+select = [
+    "E4", "E7", "E9", "F", "I", "UP", "B", "RUF", "NPY201", "D", "D401", "W505",
+    "PT006", "PT007", "PT011", "PT016",
+]
+ignore = ["D101", "D102", "D103", "D105", "D106", "D107"]
+# Typographic glyphs used in user-facing copy, where the real mark
+# reads better than its ASCII lookalike: "×" (U+00D7) in speed copy ("5.8× realtime"),
+# and the curly quotes plus en dash that set the onboarding transcript as a quotation
+# ("…" – You). Allowed past RUF001/RUF002.
+allowed-confusables = ["×", "“", "”", "–"]
+
+[tool.ruff.lint.per-file-ignores]
+# PyGObject requires `gi.require_version(...)` *before* `from gi.repository
+# import ...`, and `__init__` sets GI_TYPELIB_PATH and preloads the bundled
+# libraries before any gi import; both trip E402
+# (module-level import not at top of file).
+"src/quoth/__init__.py" = ["E402"]
+"src/quoth/about.py" = ["E402"]
+"src/quoth/app.py" = ["E402"]
+"src/quoth/benchmark_dialog.py" = ["E402"]
+"src/quoth/audio.py" = ["E402"]
+"src/quoth/animation.py" = ["E402"]
+"src/quoth/backdrop.py" = ["E402"]
+"src/quoth/engine_section.py" = ["E402"]
+"src/quoth/hotkey_capture.py" = ["E402"]
+"src/quoth/motion.py" = ["E402"]
+"src/quoth/autostart.py" = ["E402"]
+"src/quoth/onboarding.py" = ["E402"]
+"src/quoth/optimize.py" = ["E402"]
+"src/quoth/overlay.py" = ["E402"]
+"src/quoth/overlay_section.py" = ["E402"]
+"src/quoth/pill_render.py" = ["E402"]
+"src/quoth/pill_view.py" = ["E402"]
+"src/quoth/progress.py" = ["E402"]
+"src/quoth/settings_window.py" = ["E402"]
+"src/quoth/skin_runtime.py" = ["E402"]
+"src/quoth/sound.py" = ["E402"]
+"src/quoth/tray.py" = ["E402"]
+"src/quoth/try_it.py" = ["E402"]
+"src/quoth/typing_setup.py" = ["E402"]
+# A test docstring describes the behaviour under test rather than commanding it.
+"tests/**" = ["D401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pycodestyle]
+max-doc-length = 88
+
+# --- Architecture contract (import-linter) --------------------------------
+# Every module sits in one of six tiers, named by what it is, highest first: a module
+# may import its own tier and any lower one, never a higher one. The contracts after
+# the tiers pin the boundaries that matter on their own. Run `uv run lint-imports`.
+[tool.importlinter]
+root_package = "quoth"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "No import cycles between modules"
+type = "acyclic_siblings"
+ancestors = ["quoth"]
+
+[[tool.importlinter.contracts]]
+name = "Tiers: entry > app > ui > services > adapters > domain"
+type = "layers"
+containers = ["quoth"]
+exhaustive = true
+layers = [
+    # The command line, which runs before the app loads.
+    "__main__ : cli",
+    # The composition root.
+    "app",
+    # What the user sees and reads: windows, drawing and their copy, GTK or not.
+    "about : animation : backdrop : benchmark_dialog : brand : download_format : easing : engine_section : hotkey_capture : motion : onboarding : optimize : orb : overlay : overlay_section : pill_render : pill_view : presentation : progress : settings_window : shortcut_setup : skin_section : tray : try_it : typing_setup",
+    # GTK-free logic that the views drive.
+    "calibration : downloads : prepare : recording : resolution : settings : update_notifier",
+    # The OS, the desktop, native libraries and the network.
+    "_native : audio : autostart : config : crash_reports : downloader : environment : hardware : ipc : listener : log : lottie : portal_shortcuts : scheduler : skin_runtime : sound : typer : updates : whisper",
+    # Data, catalogs, file formats and rules.
+    "accel : atomic_write : color : keynames : languages : models : paths : skin : stats : theme : trigger",
+]
+
+[[tool.importlinter.contracts]]
+name = "The Settings window and onboarding never import each other"
+type = "independence"
+modules = ["quoth.settings_window", "quoth.onboarding"]
+
+[[tool.importlinter.contracts]]
+name = "The recording and settings controllers never import each other"
+type = "independence"
+modules = ["quoth.recording", "quoth.settings"]
+
+# GLib reaches services and domain only through scheduler and audio, so they stay headless.
+[[tool.importlinter.contracts]]
+name = "Services and domain never import gi"
+type = "forbidden"
+source_modules = ["quoth.calibration", "quoth.downloads", "quoth.prepare", "quoth.recording", "quoth.resolution", "quoth.settings", "quoth.update_notifier", "quoth.accel", "quoth.atomic_write", "quoth.color", "quoth.keynames", "quoth.languages", "quoth.models", "quoth.paths", "quoth.skin", "quoth.stats", "quoth.theme", "quoth.trigger"]
+forbidden_modules = ["gi"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Only crash_reports touches sentry_sdk"
+type = "protected"
+protected_modules = ["sentry_sdk"]
+allowed_importers = ["quoth.crash_reports"]
+
+[[tool.importlinter.contracts]]
+name = "Only listener touches evdev"
+type = "protected"
+protected_modules = ["evdev"]
+allowed_importers = ["quoth.listener"]
+
+[[tool.importlinter.contracts]]
+name = "ctypes only behind the native seams"
+type = "protected"
+protected_modules = ["ctypes"]
+allowed_importers = ["quoth", "quoth.whisper", "quoth.hardware", "quoth.lottie"]
+as_packages = false
+
+[[tool.importlinter.contracts]]
+name = "Host processes only from typer and shortcut_setup"
+type = "protected"
+protected_modules = ["subprocess"]
+allowed_importers = ["quoth.typer", "quoth.shortcut_setup"]
+
+[[tool.importlinter.contracts]]
+name = "Network egress only from downloader and updates"
+type = "forbidden"
+source_modules = ["quoth.*"]
+forbidden_modules = ["urllib", "http", "socket", "httpx", "requests", "openai", "aiohttp"]
+allow_indirect_imports = true
+ignore_imports = [
+    "quoth.downloader -> urllib",
+    "quoth.downloader -> http",
+    "quoth.updates -> urllib",
+    "quoth.updates -> http",
+]
+
+[[tool.importlinter.contracts]]
+name = "accel is a pure leaf: device meaning has no runtime dependencies"
+type = "forbidden"
+source_modules = ["quoth.accel"]
+forbidden_modules = ["quoth.*"]
+
+[[tool.importlinter.contracts]]
+name = "Hardware detection is a leaf over _native that any tier can probe"
+type = "forbidden"
+source_modules = ["quoth.hardware"]
+forbidden_modules = ["quoth.*"]
+ignore_imports = ["quoth.hardware -> quoth._native"]

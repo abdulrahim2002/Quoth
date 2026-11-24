@@ -1,0 +1,114 @@
+# Maintainer: Samuel Ruairí Bullard <samuel.ruairi.bullard@gmail.com>
+#
+# Quoth (VCS): builds the latest `main`. The stable counterpart is `quoth`.
+# Same build/install body as the stable recipe; only the source and pkgver()
+# differ. Vulkan + Intel-NPU OpenVINO encoder; see the stable PKGBUILD for the
+# NPU/OpenVINO rationale.
+
+pkgname=quoth-git
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc="Offline, private, instant voice dictation for Linux (Wayland; GPU via Vulkan, Intel NPU via OpenVINO) (git)"
+arch=('x86_64')
+url="https://quoth.dev"
+# The GPL app plus its bundled components and assets, as one SPDX expression.
+license=('GPL-3.0-or-later AND MIT AND Apache-2.0 AND ISC AND BSD-3-Clause AND FTL AND MPL-2.0')
+options=(!debug)   # no -debug package: Arch's debuginfod covers official packages only
+# Pinned native sources, kept in sync with packaging/pins.sh by scripts/sync_pins.sh.
+_sentryver="2.72.0"
+_whispertag="v1.9.5"   # floor is 1.8.1; 1.8.0 broke iGPU Vulkan
+_whispersha="ff1a9053feb509ff9d7729703355541ae9690073a6b1c40eb692c962e0dc1720"
+# OpenVINO runtime for the NPU encoder; files extracted, so Python tag is moot.
+_ovwheel="openvino-2026.4.1-22982-cp310-cp310-manylinux_2_28_x86_64.whl"
+_ovurl="https://files.pythonhosted.org/packages/c4/57/b2d53cfb56be03449a95df18a76fe443ae94b16b3ae15128ca65e08dcd91/openvino-2026.4.1-22982-cp310-cp310-manylinux_2_28_x86_64.whl"
+_ovsha="47dcccbab40a23aed1dc4af7c43a9c813cc61f684d66498e1627d407d5f2770b"
+# ThorVG: the Lottie renderer. Arch has no official package (AUR only), so
+# it is built from source here like every other channel.
+_thorvgtag="v1.1.3"
+_thorvgsha="ba9957aeeadb4151d4486f11c638ae118c00210fa4906daa7b30143aa341e690"
+provides=("quoth=${pkgver}")
+conflicts=('quoth')
+
+depends=(
+  glib2 gtk4 libadwaita pango python-gobject dconf hicolor-icon-theme
+  gstreamer gst-plugins-base-libs gst-plugins-good gst-plugin-pipewire
+  gtk4-layer-shell wl-clipboard wtype ydotool
+  glibc libgcc libstdc++ libgomp vulkan-icd-loader
+  python python-numpy python-evdev python-loguru python-cairo "python-sentry_sdk>=${_sentryver}"
+  intel-npu-driver intel-npu-compiler
+)
+optdepends=(
+  'vulkan-radeon: GPU acceleration on AMD graphics'
+  'vulkan-intel: GPU acceleration on Intel graphics'
+  'nvidia-utils: GPU acceleration on NVIDIA graphics'
+  'gnome-shell-extension-appindicator: tray icon on GNOME'
+)
+makedepends=(
+  cmake meson ninja shaderc spirv-headers vulkan-headers git
+  python-build python-installer python-wheel python-hatchling
+)
+install="quoth.install"
+source=(
+  "quoth::git+https://github.com/abullard1/Quoth.git"
+  "whisper.cpp-$_whispertag.tar.gz::https://github.com/ggml-org/whisper.cpp/archive/refs/tags/$_whispertag.tar.gz"
+  "$_ovurl"
+  "thorvg-$_thorvgtag.tar.gz::https://github.com/thorvg/thorvg/archive/refs/tags/$_thorvgtag.tar.gz"
+)
+sha256sums=(
+  'SKIP'
+  "$_whispersha"
+  "$_ovsha"
+  "$_thorvgsha"
+)
+
+pkgver() {
+  cd "$srcdir/quoth"
+  # pipefail, so a clone without tags falls back instead of yielding an empty version.
+  ( set -o pipefail
+    git describe --long --tags 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' ||
+      printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  )
+}
+
+prepare() {
+  rm -rf "$srcdir/whisper.cpp"
+  mv "$srcdir/whisper.cpp-${_whispertag#v}" "$srcdir/whisper.cpp"
+  "$srcdir/quoth/scripts/apply_whisper_patches.sh" \
+    --apply "$srcdir/whisper.cpp"
+  rm -rf "$srcdir/thorvg"
+  mv "$srcdir/thorvg-${_thorvgtag#v}" "$srcdir/thorvg"
+  rm -rf "$srcdir/openvino-wheel"
+  python -m zipfile -e "$srcdir/$_ovwheel" "$srcdir/openvino-wheel"
+}
+
+build() {
+  cd "$srcdir/quoth"
+  make build WHISPER_DIR="$srcdir/whisper.cpp" \
+    WITH_OPENVINO=ON OpenVINO_DIR="$srcdir/openvino-wheel/openvino/cmake"
+  make vendor-openvino OPENVINO_WHEEL_DIR="$srcdir/openvino-wheel"
+  make vendor-thorvg THORVG_SRC="$srcdir/thorvg"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "$srcdir/quoth"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  appver="$(sed -nE 's/^version = "([^"]+)".*/\1/p' pyproject.toml | head -1)"
+  commit="$(git rev-parse HEAD)"
+  make install-data DESTDIR="$pkgdir" PREFIX=/usr \
+    QUOTH_RELEASE="${QUOTH_RELEASE:-quoth@${appver}+g${commit}}" \
+    QUOTH_ENVIRONMENT="${QUOTH_ENVIRONMENT:-development}" \
+    QUOTH_CHANNEL=aur
+  # Bundled third-party licence texts, beside the six install-data puts under
+  # licenses/quoth. MIT and Apache-2.0 each carry their own copyright, so ship
+  # them explicitly (the native libwhisper + OpenVINO staged during build()).
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/${pkgname%-git}/LICENSE"
+  install -Dm644 lib/LICENSE.whisper-cpp \
+    "$pkgdir/usr/share/licenses/${pkgname%-git}/LICENSE.whisper-cpp"
+  install -Dm644 lib/openvino/licenses/LICENSE \
+    "$pkgdir/usr/share/licenses/${pkgname%-git}/LICENSE.openvino"
+  install -Dm644 lib/LICENSE.thorvg \
+    "$pkgdir/usr/share/licenses/${pkgname%-git}/LICENSE.thorvg"
+  # Arch tooling looks for a package's licences under its own name.
+  ln -s quoth "$pkgdir/usr/share/licenses/$pkgname"
+}

@@ -1,0 +1,44 @@
+# Overlay theme: import under Feedback -> Overlay theme.
+# This changes the Pill and Orb colours, independently of the app skin.
+schema = 1
+
+[meta]
+name = "Motion Lab - Compact Fast"
+author = "Local test"
+description = "Compact Pill, smaller text and quick transitions. Compare with Large Back."
+
+[colors]
+background = "#2B160FF2"
+border = "#FFBD694D"
+accent = "#FFB454F2"
+text = "#FFF3E4FF"
+dot_recording = "#FFB454"
+dot_transcribing = "#FFE4A1"
+dot_error = "#FF667A"
+
+[geometry]
+width = 180
+height = 32
+border_width = 0.8
+bar_gap = 2
+line_width = 1.25
+
+[position]
+anchor = "bottom-center"
+margin = 48
+
+[font]
+family = "sans-serif"
+size = 10
+
+[animation]
+enabled = true
+duration_scale = 0.65
+
+[animation.entry]
+duration = 0.08
+easing = "ease-out-expo"
+
+[animation.exit]
+duration = 0.1
+easing = "ease-in-cubic"

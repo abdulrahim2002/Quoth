@@ -1,0 +1,114 @@
+diff --git a/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp b/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
+--- a/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
++++ b/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
+@@ -6,6 +6,7 @@
+ #include <intrin.h>
+ #endif
+ 
++#include <cstdint>
+ #include <cstring>
+ #include <vector>
+ #include <bitset>
+@@ -88,6 +89,35 @@ struct cpuid_x86 {
+     bool AMX_BF16(void) { return f_7_edx[22]; }
+ 
+ #ifdef _MSC_VER
++    static uint64_t xgetbv(unsigned int xcr) {
++        return _xgetbv(xcr);
++    }
++#else
++    static uint64_t xgetbv(unsigned int xcr) {
++        unsigned int eax;
++        unsigned int edx;
++        __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(xcr));
++        return (static_cast<uint64_t>(edx) << 32) | eax;
++    }
++#endif
++
++    bool os_saves(uint64_t mask) {
++        return XSAVE() && OSXSAVE() && (xgetbv(0) & mask) == mask;
++    }
++
++    bool os_saves_ymm(void) {
++        return os_saves(0x6);
++    }
++
++    bool os_saves_zmm(void) {
++        return os_saves(0xe6);
++    }
++
++    bool os_saves_amx(void) {
++        return os_saves(0x600e6);
++    }
++
++#ifdef _MSC_VER
+     static void cpuid(int cpu_info[4], int eax) {
+         __cpuid(cpu_info, eax);
+     }
+@@ -261,17 +291,15 @@ void test_x86_is() {
+ #endif
+ 
+ static int ggml_backend_cpu_x86_score() {
+-    // FIXME: this does not check for OS support
+-
+     int score = 1;
+     cpuid_x86 is;
+ 
+ #ifdef GGML_FMA
+-    if (!is.FMA()) { return 0; }
++    if (!is.FMA() || !is.os_saves_ymm()) { return 0; }
+     score += 1;
+ #endif
+ #ifdef GGML_F16C
+-    if (!is.F16C()) { return 0; }
++    if (!is.F16C() || !is.os_saves_ymm()) { return 0; }
+     score += 1<<1;
+ #endif
+ #ifdef GGML_SSE42
+@@ -283,15 +311,15 @@ static int ggml_backend_cpu_x86_score() {
+     score += 1<<3;
+ #endif
+ #ifdef GGML_AVX
+-    if (!is.AVX()) { return 0; }
++    if (!is.AVX() || !is.os_saves_ymm()) { return 0; }
+     score += 1<<4;
+ #endif
+ #ifdef GGML_AVX2
+-    if (!is.AVX2()) { return 0; }
++    if (!is.AVX2() || !is.os_saves_ymm()) { return 0; }
+     score += 1<<5;
+ #endif
+ #ifdef GGML_AVX_VNNI
+-    if (!is.AVX_VNNI()) { return 0; }
++    if (!is.AVX_VNNI() || !is.os_saves_ymm()) { return 0; }
+     score += 1<<6;
+ #endif
+ #ifdef GGML_AVX512
+@@ -300,22 +328,23 @@ static int ggml_backend_cpu_x86_score() {
+     if (!is.AVX512VL()) { return 0; }
+     if (!is.AVX512DQ()) { return 0; }
+     if (!is.AVX512BW()) { return 0; }
++    if (!is.os_saves_zmm()) { return 0; }
+     score += 1<<7;
+ #endif
+ #ifdef GGML_AVX512_VBMI
+-    if (!is.AVX512_VBMI()) { return 0; }
++    if (!is.AVX512_VBMI() || !is.os_saves_zmm()) { return 0; }
+     score += 1<<8;
+ #endif
+ #ifdef GGML_AVX512_BF16
+-    if (!is.AVX512_BF16()) { return 0; }
++    if (!is.AVX512_BF16() || !is.os_saves_zmm()) { return 0; }
+     score += 1<<9;
+ #endif
+ #ifdef GGML_AVX512_VNNI
+-    if (!is.AVX512_VNNI()) { return 0; }
++    if (!is.AVX512_VNNI() || !is.os_saves_zmm()) { return 0; }
+     score += 1<<10;
+ #endif
+ #ifdef GGML_AMX_INT8
+-    if (!is.AMX_INT8()) { return 0; }
++    if (!is.AMX_INT8() || !is.os_saves_amx()) { return 0; }
+     score += 1<<11;
+ #endif
+ 

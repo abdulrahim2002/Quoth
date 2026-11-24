@@ -1,0 +1,26 @@
+# Catppuccin (https://catppuccin.com): Latte by day, Mocha by night.
+kind = "skin"
+schema = 1
+
+[meta]
+name        = "Catppuccin"
+author      = "Quoth (port of Catppuccin Latte and Mocha)"
+description = "Soothing pastels with a mauve accent."
+
+[light]
+window    = "#E6E9EF" # Latte Mantle
+view      = "#EFF1F5" # Latte Base
+card      = "#EFF1F5" # Latte Base
+popover   = "#EFF1F5" # Latte Base
+text      = "#4C4F69" # Latte Text
+accent    = "#8839EF" # Latte Mauve
+on_accent = "#EFF1F5" # Latte Base
+
+[dark]
+window    = "#181825" # Mocha Mantle
+view      = "#1E1E2E" # Mocha Base
+card      = "#313244" # Mocha Surface0
+popover   = "#313244" # Mocha Surface0
+text      = "#CDD6F4" # Mocha Text
+accent    = "#CBA6F7" # Mocha Mauve
+on_accent = "#1E1E2E" # Mocha Base

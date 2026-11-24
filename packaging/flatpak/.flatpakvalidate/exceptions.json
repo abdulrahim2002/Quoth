@@ -1,0 +1,6 @@
+{
+  "dev.quoth.Quoth": [
+    "finish-args-flatpak-spawn-access",
+    "finish-args-only-wayland"
+  ]
+}

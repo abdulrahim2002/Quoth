@@ -1,0 +1,39 @@
+# Keeps dependencies current. The github-actions updater is the companion to
+# SHA-pinning every action: without it the pins silently rot.
+version: 2
+
+updates:
+  # A week's cooldown lets a compromised release be caught and yanked before it is
+  # proposed here. Security updates bypass it.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "uv"
+    directories:
+      - "/"
+      - "/lab"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        patterns: ["*"]
+    # Updates touch the lockfiles only, so no floor in pyproject.toml moves. A security
+    # fix that needs a manifest change shows only as an alert and a failing `uv audit`.
+    versioning-strategy: lockfile-only
+    ignore:
+      # packaging/pins.sh owns the Sentry SDK version the packages bundle, so the lock
+      # stays on it and the tests run that SDK. Security updates still apply.
+      - dependency-name: "sentry-sdk"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"

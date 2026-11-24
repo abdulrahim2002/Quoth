@@ -1,0 +1,108 @@
+name: Bug report
+description: Report a reproducible problem with Quoth
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security or privacy vulnerabilities belong in the [private reporting route](https://github.com/abullard1/Quoth/security/advisories/new), not a public issue.
+
+        **Do not attach recordings, dictated text or credentials, and check logs and screenshots for private details such as your home folder path.**
+
+  - type: input
+    id: version
+    attributes:
+      label: Quoth version
+      description: "From About, or `quoth --version` (in the Flatpak, `flatpak run dev.quoth.Quoth --version`)."
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Install channel
+      options:
+        - .deb / APT repository
+        - Direct Flatpak
+        - Arch package (built from the repository)
+        - Source checkout
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: system
+    attributes:
+      label: Distribution and version
+      placeholder: Pop!_OS 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop and session
+      description: Include the desktop version and whether the session is Wayland.
+      placeholder: COSMIC on Wayland
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Dictation key / shortcut
+        - Audio capture
+        - Model download
+        - Transcription
+        - Text insertion / clipboard
+        - Overlay / tray / notifications
+        - Settings / onboarding
+        - Hardware acceleration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Give the smallest sequence that reliably shows the problem. Use placeholder text instead of real dictation.
+      placeholder: |
+        1. Start Quoth
+        2. Open a supported text field
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Optional. Paste the relevant lines of Quoth's log, with private paths or content removed. [Troubleshooting](https://github.com/abullard1/Quoth/blob/main/SUPPORT.md#troubleshooting) says where the log is. Do not paste terminal output from `QUOTH_LOG_LEVEL=TRACE`, which shows your dictation.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed recordings, dictated text, credentials and private paths from this report and its attachments.
+          required: true

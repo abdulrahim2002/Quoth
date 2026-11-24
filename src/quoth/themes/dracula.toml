@@ -1,0 +1,16 @@
+# Dracula (https://draculatheme.com): the dark Dracula palette on the pill.
+schema = 1
+
+[meta]
+name        = "Dracula"
+author      = "Quoth (port of Dracula)"
+description = "The classic dark theme: purple on near-black, famous colors intact."
+
+[colors]
+background       = "#282A36D9" # Background
+border           = "#F8F8F21A" # Foreground
+accent           = "#BD93F9E5" # Purple
+text             = "#F8F8F2E5" # Foreground
+dot_recording    = "#50FA7B"   # Green
+dot_transcribing = "#8BE9FD"   # Cyan
+dot_error        = "#FF5555"   # Red

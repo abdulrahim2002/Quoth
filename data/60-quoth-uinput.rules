@@ -1,0 +1,4 @@
+# Quoth: let whoever is signed in at this computer's screen use /dev/uinput, so
+# ydotool can send the paste chord. To turn it off, link
+# /etc/udev/rules.d/60-quoth-uinput.rules to /dev/null and reboot.
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"

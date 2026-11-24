@@ -1,0 +1,54 @@
+name: openvino-npu-runtime
+buildsystem: simple
+build-commands:
+  # The .deb's OpenVINO wheel, unpacked until Quoth builds against its CMake config and
+  # vendor_openvino.sh takes the NPU keep-set from it; the manifest cleans it up.
+  - install -d /app/opt /app/lib
+  - python3 -m zipfile -e openvino.whl /app/opt/openvino
+  - echo "e53f2563de9072e9fc36227d4e28aad5bdb7d75d03d43f87436f8f7ab0b98955  npu-driver/intel-level-zero-npu_1.38.0.20260910-34487311128~ubuntu24.04_amd64.deb" | sha256sum -c -
+  - echo "472cdce7808e5dd5f9a239f9f3f918f0673fa8ccf93a5e1b45290f4daff41a88  npu-driver/intel-driver-compiler-npu_1.38.0.20260910-34487311128~ubuntu24.04_amd64.deb" | sha256sum -c -
+  - install -d npu-root level-zero-root
+  - ar p npu-driver/intel-level-zero-npu_1.38.0.20260910-34487311128~ubuntu24.04_amd64.deb data.tar.gz | tar -xzf - -C npu-root
+  - ar p npu-driver/intel-driver-compiler-npu_1.38.0.20260910-34487311128~ubuntu24.04_amd64.deb data.tar.gz | tar -xzf - -C npu-root
+  - ar p level-zero.deb data.tar.gz | tar -xzf - -C level-zero-root
+  # The driver loads its compiler from its own directory. The compiler takes the libtbb
+  # that OpenVINO, preloaded from Quoth's lib/openvino, has already loaded.
+  - cp -aP npu-root/usr/lib/x86_64-linux-gnu/libze_intel_npu.so* npu-root/usr/lib/x86_64-linux-gnu/libopenvino_intel_npu_compiler*.so /app/lib/
+  - cp -aP level-zero-root/usr/lib/x86_64-linux-gnu/libze_loader.so* /app/lib/
+  - install -d /app/share/licenses/openvino /app/share/licenses/intel-npu-driver /app/share/licenses/intel-npu-compiler /app/share/licenses/level-zero
+  # The wheel's Apache-2.0 LICENSE and its third-party notices, oneTBB's and hwloc's among them.
+  - cp -a /app/opt/openvino/openvino-*.dist-info/licenses/. /app/share/licenses/openvino/
+  - install -m644 npu-driver-LICENSE.md /app/share/licenses/intel-npu-driver/LICENSE.md
+  - install -m644 npu-driver-third-party-programs.txt /app/share/licenses/intel-npu-driver/third-party-programs.txt
+  - install -m644 npu-compiler-LICENSE /app/share/licenses/intel-npu-compiler/LICENSE
+  - install -m644 level-zero-LICENSE /app/share/licenses/level-zero/LICENSE
+sources:
+  - type: file
+    url: https://files.pythonhosted.org/packages/c4/57/b2d53cfb56be03449a95df18a76fe443ae94b16b3ae15128ca65e08dcd91/openvino-2026.4.1-22982-cp310-cp310-manylinux_2_28_x86_64.whl
+    sha256: 47dcccbab40a23aed1dc4af7c43a9c813cc61f684d66498e1627d407d5f2770b
+    dest-filename: openvino.whl
+  - type: archive
+    url: https://github.com/intel/linux-npu-driver/releases/download/v1.38.0/linux-npu-driver-v1.38.0.20260910-34487311128-ubuntu2404.tar.gz
+    sha256: 1efcd4b60c22abee751d8f2705962cbcc2a569de45c7e0e670cf08afbfcdc1d2
+    strip-components: 0
+    dest: npu-driver
+  - type: file
+    url: https://github.com/oneapi-src/level-zero/releases/download/v1.32.0/libze1_1.32.0%2Bu24.04_amd64.deb
+    sha256: 3c846af24f84a89150f6a4c6adcb4ea4ebef74dc119fe44f4e269bfaa72c7ba6
+    dest-filename: level-zero.deb
+  - type: file
+    url: https://raw.githubusercontent.com/intel/linux-npu-driver/v1.38.0/LICENSE.md
+    sha256: 451963b6682694730dbe4889fff2ef1c20def68992e2594880c15a28e6c87be5
+    dest-filename: npu-driver-LICENSE.md
+  - type: file
+    url: https://raw.githubusercontent.com/intel/linux-npu-driver/v1.38.0/third-party-programs.txt
+    sha256: 7ae92abe83bee3b7bac9197a4b9a151cecfce28ed8eb0a8cbd4ace5ee4ccb75a
+    dest-filename: npu-driver-third-party-programs.txt
+  - type: file
+    url: https://raw.githubusercontent.com/oneapi-src/level-zero/v1.32.0/LICENSE
+    sha256: f2e82047a47ca742088331ae2bc85b97949ed1e97dfa057cdafd03e8709fc0a2
+    dest-filename: level-zero-LICENSE
+  - type: file
+    url: https://raw.githubusercontent.com/openvinotoolkit/npu_compiler/0b38f7d42113ff329ac2bdd33583d123de4ccf2f/LICENSE
+    sha256: 9ae406b07d50d65dcdae0de9286c0a56f52f5159d7f4df05a345409be8cd262c
+    dest-filename: npu-compiler-LICENSE

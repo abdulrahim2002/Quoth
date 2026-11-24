@@ -1,0 +1,34 @@
+Description: read no_speech_prob from the prompt's start-of-transcript row
+ With a fixed language the prompt flags only its last row for logits, so
+ no_speech_prob was read from a row never written and the no-speech skip
+ never fired: a low-confidence window of silence or noise was retried at
+ higher temperatures and decoded as text.
+Origin: other, https://github.com/ggml-org/whisper.cpp/pull/4068
+Upstream-Status: Submitted [https://github.com/ggml-org/whisper.cpp/pull/4068]
+
+diff --git a/src/whisper.cpp b/src/whisper.cpp
+--- a/src/whisper.cpp
++++ b/src/whisper.cpp
+@@ -7340,6 +7340,9 @@ int whisper_full_with_state(
+ 
+                 whisper_batch_prep_legacy(state->batch, prompt.data(), prompt.size(), 0, 0);
+ 
++                const int sot_idx = (int) prompt.size() - (int) prompt_init.size();
++                state->batch.logits[sot_idx] = 1;
++
+                 if (!whisper_decode_internal(*ctx, *state, state->batch, params.n_threads, false, params.abort_callback, params.abort_callback_user_data)) {
+                     WHISPER_LOG_ERROR("%s: failed to decode\n", __func__);
+                     return -8;
+@@ -7352,8 +7355,10 @@ int whisper_full_with_state(
+                     std::vector<float> logprobs(n_logits);
+                     std::vector<float> probs(n_logits);
+ 
+-                    whisper_compute_logprobs(state->logits, n_logits, logprobs);
+-                    whisper_compute_probs(state->logits, n_logits, logprobs, probs);
++                    const std::vector<float> logits_sot(state->logits.begin() + sot_idx*n_logits,
++                                                        state->logits.begin() + (sot_idx + 1)*n_logits);
++                    whisper_compute_logprobs(logits_sot, n_logits, logprobs);
++                    whisper_compute_probs(logits_sot, n_logits, logprobs, probs);
+                     state->no_speech_prob = probs[whisper_token_nosp(ctx)];
+                 }
+ 

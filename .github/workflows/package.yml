@@ -1,0 +1,671 @@
+name: Packages (.deb, Arch, Flatpak)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'packaging/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'data/**'
+      - 'src/quoth/**'
+      - 'Makefile'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/package.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/**'
+      - 'lib/**'
+      - 'scripts/**'
+      - 'data/**'
+      - 'src/quoth/**'
+      - 'Makefile'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/package.yml'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Package identity
+        type: choice
+        options: [staging, production]
+        default: staging
+  schedule:
+    - cron: '17 5 * * 1'
+
+permissions:
+  contents: read
+
+# Only pull requests cancel superseded runs: a release preparation names its package run.
+concurrency:
+  group: package-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MODEL_URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base-q8_0.bin
+  MODEL_SHA256: c577b9a86e7e048a0b7eada054f4dd79a56bbfa911fbdacf900ac5b567cbb7d9
+  AUDIO_URL: https://raw.githubusercontent.com/ggml-org/whisper.cpp/v1.8.6/samples/jfk.wav
+  AUDIO_SHA256: 59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e
+
+# Pull requests always run on GitHub-hosted runners. Other events use the runner the
+# TRUSTED_RUNNER variable names, or ubuntu-24.04 when it is unset.
+# Shell blocks testing RUNNER_ENVIRONMENT set up a hosted runner.
+jobs:
+  identity:
+    name: Resolve package identity
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      release: ${{ steps.identity.outputs.release }}
+      environment: ${{ steps.identity.outputs.environment }}
+      target: ${{ steps.identity.outputs.target }}
+      source_commit: ${{ steps.identity.outputs.source_commit }}
+      metadata: ${{ steps.identity.outputs.metadata }}
+      packaging: ${{ steps.inputs.outputs.packaging }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # A pull request changing only the app builds only Arch. A push builds every channel,
+      # since a newer push replaces a queued run and its diff would miss that run's changes.
+      - name: Detect package input changes
+        id: inputs
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          packaging=true
+          if [ -n "$BASE" ] && git diff --quiet "$BASE" HEAD -- packaging lib scripts \
+            data src/quoth/backgrounds src/quoth/__init__.py src/quoth/_native.py \
+            src/quoth/audio.py src/quoth/crash_reports.py src/quoth/hardware.py \
+            src/quoth/typer.py src/quoth/whisper.py Makefile pyproject.toml uv.lock \
+            .github/workflows/package.yml; then
+            packaging=false
+          fi
+          echo "packaging=$packaging" >> "$GITHUB_OUTPUT"
+      - name: Resolve identity
+        id: identity
+        env:
+          TARGET: ${{ inputs.target || 'staging' }}
+        run: |
+          bash scripts/sync_pins.sh --check
+          version=$(sed -nE 's/^version = "([^"]+)".*/\1/p' pyproject.toml | head -1)
+          source_commit=$(git rev-parse HEAD)
+          if [ "$TARGET" = production ]; then
+            test "$GITHUB_REF" = "refs/tags/v$version" || {
+              echo 'Production packages require the matching release tag.' >&2
+              exit 1
+            }
+            release="quoth@$version"
+            environment=production
+          else
+            release="quoth@${version}+g${source_commit}"
+            environment=candidate
+          fi
+          metadata=$(jq -cn \
+            --arg version "$version" --arg release "$release" \
+            --arg environment "$environment" --arg source_commit "$source_commit" \
+            --arg target "$TARGET" \
+            '{version: $version, release: $release, environment: $environment,
+              source_commit: $source_commit, target: $target}')
+          printf '%s\n' \
+            "version=$version" "release=$release" "environment=$environment" \
+            "target=$TARGET" "source_commit=$source_commit" "metadata=$metadata" \
+            >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build Ubuntu 24.04 package
+    needs: identity
+    if: needs.identity.outputs.packaging == 'true'
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    env:
+      QUOTH_RELEASE: ${{ needs.identity.outputs.release }}
+      QUOTH_ENVIRONMENT: ${{ needs.identity.outputs.environment }}
+      SOURCE_COMMIT: ${{ needs.identity.outputs.source_commit }}
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and export
+        run: |
+          mkdir -p "$RUNNER_TEMP/package"
+          printf '%s\n' "$SOURCE_COMMIT" > "$RUNNER_TEMP/package/source-commit.txt"
+          printf '%s\n' "$RELEASE_METADATA" > "$RUNNER_TEMP/package/release-metadata.json"
+          {
+            docker build --pull -t quoth-deb packaging/debian/.dockervalidate
+            docker run --rm -v "$PWD:/work:ro" \
+              -v "$RUNNER_TEMP/package:/out" -e OUTPUT_DIR=/out \
+              -e SOURCE_COMMIT -e QUOTH_RELEASE -e QUOTH_ENVIRONMENT quoth-deb
+          } 2>&1 | tee "$RUNNER_TEMP/deb-build.log"
+          # The components' source travels as its own artifact with the same sidecars.
+          mkdir -p "$RUNNER_TEMP/package-sources"
+          mv "$RUNNER_TEMP/package/quoth-deb-sources.tar.gz" "$RUNNER_TEMP/package-sources/"
+          cp "$RUNNER_TEMP/package/source-commit.txt" "$RUNNER_TEMP/package/release-metadata.json" \
+            "$RUNNER_TEMP/package-sources/"
+          (cd "$RUNNER_TEMP/package-sources" && sha256sum quoth-deb-sources.tar.gz > SHA256SUMS)
+          cd "$RUNNER_TEMP/package"
+          sha256sum ./*.deb > SHA256SUMS
+      # Not a release asset: a production run attests it for the .deb.
+      - name: Write the bill of materials
+        run: |
+          python3 -I scripts/package_sbom.py deb --commit "$SOURCE_COMMIT" \
+            --output "$RUNNER_TEMP/quoth-deb.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb-sources-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package-sources/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb-sbom-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/quoth-deb.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: deb-build-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deb-build.log
+          retention-days: 14
+      # A failed job's page shows the end of its logs, which are uploaded in full above.
+      - name: Summarise the failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          cd "$RUNNER_TEMP"
+          exec >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```'
+          tail -v -n 40 deb-build.log || true
+          echo '```'
+
+  install-test:
+    name: Install Debian package and transcribe on CPU
+    needs: [identity, build]
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    env:
+      QUOTH_RELEASE: ${{ needs.identity.outputs.release }}
+      QUOTH_ENVIRONMENT: ${{ needs.identity.outputs.environment }}
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package/
+      - name: Verify package and source identity
+        run: |
+          bash scripts/check_package_identity.sh "$RUNNER_TEMP/package" \
+            2>&1 | tee "$RUNNER_TEMP/package-identity.log"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fixtures/ggml-base-q8_0.bin
+          key: transcription-model-${{ env.MODEL_SHA256 }}
+      - name: Fetch and verify public fixtures
+        run: bash scripts/fetch_fixtures.sh "$RUNNER_TEMP/fixtures"
+      - name: Test the installed package in a clean container
+        run: |
+          docker run --rm -i --pull=always \
+            -e DEBIAN_FRONTEND=noninteractive \
+            -e QUOTH_RELEASE -e QUOTH_ENVIRONMENT \
+            -v "$RUNNER_TEMP/package:/package:ro" \
+            -v "$RUNNER_TEMP/fixtures:/fixtures:ro" \
+            -v "$PWD/scripts:/checks:ro" \
+            -w /tmp ubuntu:24.04 bash -seuo pipefail <<'RUNTIME' 2>&1 | tee "$RUNNER_TEMP/deb-runtime.log"
+          apt-get update
+          apt-get install -y --no-install-recommends /package/*.deb
+          useradd --create-home quoth-test
+          runuser -u quoth-test -- python3 -I /checks/check_transcription.py \
+            --model /fixtures/ggml-base-q8_0.bin --audio /fixtures/jfk.wav
+          library=$(python3 -I -c 'import pathlib, quoth; print(pathlib.Path(quoth.__file__).parent / "lib/libwhisper.so")')
+          runuser -u quoth-test -- python3 -I /checks/check_whisper_model_boundary.py \
+            "$library" /fixtures/ggml-base-q8_0.bin
+          runuser -u quoth-test -- quoth --help
+          # check_install needs readelf and a display. They install only after the
+          # checks above, so they cannot satisfy a dependency the package forgot.
+          apt-get install -y --no-install-recommends binutils xvfb xauth
+          runuser -u quoth-test -- env GDK_BACKEND=x11 GTK_A11Y=none \
+            timeout 30s xvfb-run -a -s '-screen 0 1024x768x24' \
+            python3 -I /checks/check_install.py \
+            --package-channel debian \
+            --expected-release "$QUOTH_RELEASE" \
+            --expected-environment "$QUOTH_ENVIRONMENT"
+          RUNTIME
+      - name: Verify supported Debian installs and old-release refusal
+        run: |
+          TMPDIR="$RUNNER_TEMP" bash packaging/debian/.dockervalidate/matrix.sh \
+            "$RUNNER_TEMP/package/"*.deb "$QUOTH_RELEASE" "$QUOTH_ENVIRONMENT" \
+            2>&1 | tee "$RUNNER_TEMP/deb-matrix.log"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: deb-runtime-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/deb-runtime.log
+            ${{ runner.temp }}/deb-matrix.log
+            ${{ runner.temp }}/matrix-*.log
+            ${{ runner.temp }}/package-identity.log
+          retention-days: 14
+      - name: Summarise the failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          cd "$RUNNER_TEMP"
+          exec >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```'
+          tail -v -n 40 package-identity.log deb-runtime.log deb-matrix.log || true
+          echo '```'
+
+  arch-build:
+    name: Build Arch package
+    needs: identity
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    env:
+      QUOTH_RELEASE: ${{ needs.identity.outputs.release }}
+      QUOTH_ENVIRONMENT: ${{ needs.identity.outputs.environment }}
+      SOURCE_COMMIT: ${{ needs.identity.outputs.source_commit }}
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and export
+        run: |
+          mkdir -p "$RUNNER_TEMP/package"
+          printf '%s\n' "$SOURCE_COMMIT" > "$RUNNER_TEMP/package/source-commit.txt"
+          printf '%s\n' "$RELEASE_METADATA" > "$RUNNER_TEMP/package/release-metadata.json"
+          {
+            free -h
+            docker build --pull -t quoth-arch packaging/aur/.dockervalidate
+            docker run --name "quoth-arch-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" \
+              -v "$PWD:/work:ro" \
+              -e OUTPUT_DIR=/home/builder/package \
+              -e SOURCE_COMMIT -e QUOTH_RELEASE -e QUOTH_ENVIRONMENT quoth-arch
+            docker cp "quoth-arch-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT:/home/builder/package/." \
+              "$RUNNER_TEMP/package/"
+            cd "$RUNNER_TEMP/package"
+            sha256sum ./*.pkg.tar.zst > SHA256SUMS
+          } 2>&1 | tee "$RUNNER_TEMP/arch-build.log"
+      - name: Remove build container
+        if: always()
+        run: docker rm -f "quoth-arch-build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" 2>/dev/null || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: arch-build-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/arch-build.log
+          retention-days: 14
+      - name: Summarise the failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          cd "$RUNNER_TEMP"
+          exec >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```'
+          tail -v -n 40 arch-build.log || true
+          echo '```'
+
+  arch-install-test:
+    name: Install Arch package and transcribe on CPU
+    needs: [identity, arch-build]
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    env:
+      QUOTH_RELEASE: ${{ needs.identity.outputs.release }}
+      QUOTH_ENVIRONMENT: ${{ needs.identity.outputs.environment }}
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: arch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package/
+      - name: Verify package and source identity
+        run: |
+          bash scripts/check_package_identity.sh "$RUNNER_TEMP/package" \
+            2>&1 | tee "$RUNNER_TEMP/package-identity.log"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fixtures/ggml-base-q8_0.bin
+          key: transcription-model-${{ env.MODEL_SHA256 }}
+      - name: Fetch and verify public fixtures
+        run: bash scripts/fetch_fixtures.sh "$RUNNER_TEMP/fixtures"
+      - name: Test the installed package in a clean container
+        run: |
+          mkdir -p "$RUNNER_TEMP/headless"
+          docker run --rm -i --pull=always \
+            -e QUOTH_RELEASE -e QUOTH_ENVIRONMENT \
+            -v "$RUNNER_TEMP/package:/package:ro" \
+            -v "$RUNNER_TEMP/fixtures:/fixtures:ro" \
+            -v "$PWD/scripts:/checks:ro" \
+            -v "$RUNNER_TEMP/headless:/headless" \
+            -w /tmp archlinux:latest bash -seuo pipefail <<'RUNTIME' 2>&1 | tee "$RUNNER_TEMP/arch-runtime.log"
+          pacman -Syu --noconfirm
+          pacman -U --noconfirm /package/*.pkg.tar.zst
+          useradd --create-home quoth-test
+          runuser -u quoth-test -- python -I /checks/check_transcription.py \
+            --model /fixtures/ggml-base-q8_0.bin --audio /fixtures/jfk.wav
+          library=$(python -I -c 'import pathlib, quoth; print(pathlib.Path(quoth.__file__).parent / "lib/libwhisper.so")')
+          runuser -u quoth-test -- python -I /checks/check_whisper_model_boundary.py \
+            "$library" /fixtures/ggml-base-q8_0.bin
+          runuser -u quoth-test -- quoth --help
+          # check_install needs readelf and a display. They install only after the
+          # checks above, so they cannot satisfy a dependency the package forgot.
+          pacman -S --noconfirm --needed binutils xorg-server-xvfb
+          runuser -u quoth-test -- env GDK_BACKEND=x11 GTK_A11Y=none \
+            timeout 30s xvfb-run -a -s '-screen 0 1024x768x24' \
+            python -I /checks/check_install.py \
+            --package-channel arch \
+            --expected-release "$QUOTH_RELEASE" \
+            --expected-environment "$QUOTH_ENVIRONMENT"
+          pacman -S --noconfirm --needed sway foot nano grim pipewire pipewire-pulse wireplumber libpulse dbus ttf-dejavu jq
+          # Headless Sway needs no realtime capability; Docker cannot grant its file cap.
+          setcap -r /usr/bin/sway
+          chown quoth-test:quoth-test /headless
+          echo 'Headless dictation covers GTK and foot paste, not onboarding, downloads, tray or overlay appearance.'
+          runuser -u quoth-test -- dbus-run-session -- bash /checks/check_headless.sh \
+            /fixtures/ggml-base-q8_0.bin /fixtures/jfk.wav /headless
+          RUNTIME
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: arch-runtime-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/arch-runtime.log
+            ${{ runner.temp }}/package-identity.log
+            ${{ runner.temp }}/headless/*.log
+            ${{ runner.temp }}/headless/*.txt
+            ${{ runner.temp }}/headless/*.png
+          retention-days: 14
+      - name: Remove headless evidence
+        if: always()
+        run: |
+          docker run --rm -v "$RUNNER_TEMP/headless:/headless" archlinux:latest \
+            chown -R "$(id -u):$(id -g)" /headless
+          rm -rf "$RUNNER_TEMP/headless"
+      - name: Summarise the failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          cd "$RUNNER_TEMP"
+          exec >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```'
+          tail -v -n 40 package-identity.log arch-runtime.log || true
+          echo '```'
+
+  flatpak-build:
+    name: Build Flatpak bundle and lint manifest
+    needs: identity
+    if: needs.identity.outputs.packaging == 'true'
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 60
+    outputs:
+      artifact-id: ${{ steps.bundle.outputs.artifact-id }}
+    env:
+      QUOTH_RELEASE: ${{ needs.identity.outputs.release }}
+      QUOTH_ENVIRONMENT: ${{ needs.identity.outputs.environment }}
+      SOURCE_COMMIT: ${{ needs.identity.outputs.source_commit }}
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and export
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          WORK: ${{ runner.temp }}/quoth-flatpak-build
+        run: |
+          mkdir -p "$RUNNER_TEMP/package"
+          printf '%s\n' "$SOURCE_COMMIT" > "$RUNNER_TEMP/package/source-commit.txt"
+          printf '%s\n' "$RELEASE_METADATA" > "$RUNNER_TEMP/package/release-metadata.json"
+          {
+            df -h "$RUNNER_TEMP"
+            if [ "$RUNNER_ENVIRONMENT" = github-hosted ]; then
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends flatpak python3-yaml dbus xvfb xauth
+              # Free hosted-runner space and open user namespaces for nested sandboxes.
+              sudo rm -rf /usr/local/lib/android
+              sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+              sudo systemctl reload apparmor
+            fi
+            free -h
+            flatpak --version
+            flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+            flatpak install --user --noninteractive flathub org.flatpak.Builder
+            dbus-run-session -- bash packaging/flatpak/.flatpakvalidate/run.sh
+            flatpak list --user --columns=ref,active
+            cp "$WORK/quoth.flatpak" "$RUNNER_TEMP/package/"
+            # The corresponding source travels as its own artifact with the same sidecars.
+            mkdir -p "$RUNNER_TEMP/package-sources"
+            cp "$RUNNER_TEMP/package/source-commit.txt" "$RUNNER_TEMP/package/release-metadata.json" \
+              "$WORK/quoth-sources.flatpak" "$RUNNER_TEMP/package-sources/"
+            (cd "$RUNNER_TEMP/package-sources" && sha256sum quoth-sources.flatpak > SHA256SUMS)
+            cd "$RUNNER_TEMP/package"
+            sha256sum quoth.flatpak > SHA256SUMS
+          } 2>&1 | tee "$RUNNER_TEMP/flatpak-build.log"
+      # Not a release asset: a production run attests it for quoth.flatpak. It reads the
+      # manifest with the PyYAML the build needs.
+      - name: Write the bill of materials
+        run: |
+          python3 -I scripts/package_sbom.py flatpak --commit "$SOURCE_COMMIT" \
+            --output "$RUNNER_TEMP/quoth-flatpak.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: bundle
+        with:
+          name: flatpak-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flatpak-sources-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/package-sources/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flatpak-sbom-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/quoth-flatpak.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Lint Flatpak manifest
+        run: |
+          dbus-run-session -- bash packaging/flatpak/.flatpakvalidate/lint.sh \
+            2>&1 | tee "$RUNNER_TEMP/flatpak-lint.log"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: flatpak-build-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/flatpak-build.log
+            ${{ runner.temp }}/flatpak-lint.log
+          retention-days: 14
+      - name: Summarise the failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          cd "$RUNNER_TEMP"
+          exec >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```'
+          tail -v -n 40 flatpak-build.log flatpak-lint.log || true
+          echo '```'
+
+  flatpak-install-test:
+    name: Install Flatpak bundle and transcribe on CPU
+    needs: [identity, flatpak-build]
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    env:
+      QUOTH_RELEASE: ${{ needs.identity.outputs.release }}
+      QUOTH_ENVIRONMENT: ${{ needs.identity.outputs.environment }}
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.flatpak-build.outputs.artifact-id }}
+          path: ${{ runner.temp }}/package/
+      - name: Verify package and source identity
+        run: |
+          bash scripts/check_package_identity.sh "$RUNNER_TEMP/package" \
+            2>&1 | tee "$RUNNER_TEMP/package-identity.log"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/fixtures/ggml-base-q8_0.bin
+          key: transcription-model-${{ env.MODEL_SHA256 }}
+      - name: Fetch and verify public fixtures
+        run: bash scripts/fetch_fixtures.sh "$RUNNER_TEMP/fixtures"
+      - name: Test the installed bundle in its runtime sandbox
+        env:
+          FLATPAK_USER_DIR: ${{ runner.temp }}/flatpak-user
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          cp scripts/check_whisper_model_boundary.py "$RUNNER_TEMP/fixtures/"
+          cd "$RUNNER_TEMP"
+          dbus-run-session -- bash -seuo pipefail <<'RUNTIME' 2>&1 | tee "$RUNNER_TEMP/flatpak-runtime.log"
+          if [ "$RUNNER_ENVIRONMENT" = github-hosted ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends flatpak xvfb xauth binutils
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+            sudo systemctl reload apparmor
+          fi
+          flatpak --version
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive "$RUNNER_TEMP/package/quoth.flatpak"
+          flatpak list --user --columns=ref,active
+          flatpak run --user --filesystem="$RUNNER_TEMP/fixtures:ro" --command=python3 \
+            dev.quoth.Quoth -I -c "$(cat "$GITHUB_WORKSPACE/scripts/check_transcription.py")" \
+            --model "$RUNNER_TEMP/fixtures/ggml-base-q8_0.bin" --audio "$RUNNER_TEMP/fixtures/jfk.wav"
+          library=$(flatpak run --user --command=python3 dev.quoth.Quoth -I -c \
+            'import pathlib, quoth; print(pathlib.Path(quoth.__file__).parent / "lib/libwhisper.so")')
+          flatpak run --user --filesystem="$RUNNER_TEMP/fixtures:ro" --command=python3 \
+            dev.quoth.Quoth -I "$RUNNER_TEMP/fixtures/check_whisper_model_boundary.py" \
+            "$library" "$RUNNER_TEMP/fixtures/ggml-base-q8_0.bin"
+          flatpak run --user --command=quoth dev.quoth.Quoth --help
+          # Quoth grants no X11 socket, so this check grants one for xvfb's display.
+          timeout 30s xvfb-run -a -s '-screen 0 1024x768x24' \
+            flatpak run --user --socket=x11 --env=GDK_BACKEND=x11 --env=GTK_A11Y=none \
+            --command=python3 dev.quoth.Quoth \
+            -I -c "$(cat "$GITHUB_WORKSPACE/scripts/check_install.py")" \
+            --package-channel flatpak \
+            --expected-release "$QUOTH_RELEASE" \
+            --expected-environment "$QUOTH_ENVIRONMENT"
+          # The Platform has no readelf; inspect the installed files from the host.
+          installed=$(flatpak info --user --show-location dev.quoth.Quoth)
+          python3 -I "$GITHUB_WORKSPACE/scripts/check_install.py" --elf-root "$installed/files" \
+            2>&1 | tee "$RUNNER_TEMP/flatpak-elf.log"
+          RUNTIME
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: flatpak-runtime-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/package-identity.log
+            ${{ runner.temp }}/flatpak-runtime.log
+            ${{ runner.temp }}/flatpak-elf.log
+          retention-days: 14
+      - name: Summarise the failure
+        if: failure()
+        continue-on-error: true
+        run: |
+          cd "$RUNNER_TEMP"
+          exec >> "$GITHUB_STEP_SUMMARY" 2>&1
+          echo '```'
+          tail -v -n 40 package-identity.log flatpak-runtime.log || true
+          echo '```'
+
+  # Production packages are release assets; attestation needs a public repository. Only
+  # this job holds the signing token, and it runs no build script, only the checks below.
+  attest:
+    name: Attest production packages
+    needs: [identity, build, flatpak-build]
+    if: needs.identity.outputs.target == 'production' && !github.event.repository.private
+    runs-on: ${{ github.event_name != 'pull_request' && vars.TRUSTED_RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # signs the production packages' attestations
+      attestations: write # stores those attestations with the repository
+    env:
+      RELEASE_METADATA: ${{ needs.identity.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deb/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb-sources-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deb-sources/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flatpak-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/flatpak/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flatpak-sources-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/flatpak-sources/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb-sbom-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deb-sbom/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: flatpak-sbom-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/flatpak-sbom/
+      - name: Verify package and source identity
+        run: |
+          for artifact in deb deb-sources flatpak flatpak-sources; do
+            bash scripts/check_package_identity.sh "$RUNNER_TEMP/$artifact"
+          done
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ runner.temp }}/deb/*.deb
+            ${{ runner.temp }}/deb-sources/quoth-deb-sources.tar.gz
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ${{ runner.temp }}/flatpak/quoth.flatpak
+            ${{ runner.temp }}/flatpak-sources/quoth-sources.flatpak
+      # The bundled components' versions and sources, as a CycloneDX predicate.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/deb/*.deb
+          sbom-path: ${{ runner.temp }}/deb-sbom/quoth-deb.cdx.json
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/flatpak/quoth.flatpak
+          sbom-path: ${{ runner.temp }}/flatpak-sbom/quoth-flatpak.cdx.json

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a vulnerability privately
+    url: https://github.com/abullard1/Quoth/security/advisories/new
+    about: Security or privacy problems go here, not in a public issue.
+  - name: Desktop support and troubleshooting
+    url: https://github.com/abullard1/Quoth/blob/main/SUPPORT.md#troubleshooting
+    about: Known desktop limits, permissions, logs and common fixes.

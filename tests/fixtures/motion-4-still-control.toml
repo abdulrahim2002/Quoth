@@ -1,0 +1,44 @@
+# Overlay theme: import under Feedback -> Overlay theme.
+# This changes the Pill and Orb colours, independently of the app skin.
+schema = 1
+
+[meta]
+name = "Motion Lab - Still Control"
+author = "Local test"
+description = "Same settings as Slow Linear, with decorative animation disabled. Timers and microphone feedback remain functional."
+
+[colors]
+background = "#2B160FF2"
+border = "#FFBD694D"
+accent = "#FFB454F2"
+text = "#FFF3E4FF"
+dot_recording = "#FFB454"
+dot_transcribing = "#FFE4A1"
+dot_error = "#FF667A"
+
+[geometry]
+width = 280
+height = 54
+border_width = 1.25
+bar_gap = 3
+line_width = 2.0
+
+[position]
+anchor = "bottom-center"
+margin = 84
+
+[font]
+family = "sans-serif"
+size = 12
+
+[animation]
+enabled = false
+duration_scale = 3.0
+
+[animation.entry]
+duration = 0.45
+easing = "linear"
+
+[animation.exit]
+duration = 0.4
+easing = "linear"

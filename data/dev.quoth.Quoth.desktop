@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Quoth
+GenericName=Voice Dictation
+Comment=Private voice dictation. Press a key, speak, and your words appear.
+Exec=quoth
+Icon=dev.quoth.Quoth
+Terminal=false
+Categories=Utility;Accessibility;
+Keywords=dictation;speech;transcription;voice;whisper;private;offline;
+StartupNotify=true
+Actions=settings;quit;
+
+[Desktop Action settings]
+Name=Settings
+Exec=quoth --settings
+
+[Desktop Action quit]
+Name=Quit
+Exec=quoth --quit

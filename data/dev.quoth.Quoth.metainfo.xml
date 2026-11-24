@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Samuel Ruairí Bullard -->
+<component type="desktop-application">
+  <id>dev.quoth.Quoth</id>
+
+  <name>Quoth</name>
+  <summary>Private voice dictation</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <developer id="dev.quoth">
+    <name>Samuel Ruairí Bullard</name>
+  </developer>
+
+  <description>
+    <p>
+      Quoth is private, open-source voice dictation for Linux. Press a key,
+      speak, and Quoth pastes the transcription into supported focused
+      applications. Transcription runs entirely on your own device, so your
+      voice and text never leave your machine: no cloud, no account. Quoth
+      downloads your chosen speech model once, then works completely offline.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Fully offline transcription powered by whisper.cpp</li>
+      <li>Vulkan GPU acceleration, Intel NPU encoder acceleration, and CPU fallback</li>
+      <li>Start dictating with a key of your choice or your desktop's own shortcut</li>
+      <li>Clipboard-based delivery to supported focused applications</li>
+      <li>Translate speech to English with the Tiny, Base and Small models</li>
+      <li>Themes for the recording overlay and color skins for the app</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">dev.quoth.Quoth.desktop</launchable>
+
+  <categories>
+    <category>Utility</category>
+    <category>Accessibility</category>
+  </categories>
+
+  <keywords>
+    <keyword>dictation</keyword>
+    <keyword>speech</keyword>
+    <keyword>transcription</keyword>
+    <keyword>voice</keyword>
+    <keyword>whisper</keyword>
+    <keyword>private</keyword>
+    <keyword>offline</keyword>
+  </keywords>
+
+  <url type="homepage">https://quoth.dev</url>
+  <url type="bugtracker">https://github.com/abullard1/Quoth/issues</url>
+  <url type="vcs-browser">https://github.com/abullard1/Quoth</url>
+  <url type="help">https://github.com/abullard1/Quoth/blob/main/SUPPORT.md</url>
+  <url type="contribute">https://github.com/abullard1/Quoth/blob/main/CONTRIBUTING.md</url>
+  <url type="donation">https://buymeacoffee.com/samuelbullard</url>
+
+  <!-- The opt-in crash reports share diagnostics that do not identify the user. -->
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-info">moderate</content_attribute>
+  </content_rating>
+
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#DCC49C</color>
+    <color type="primary" scheme_preference="dark">#614730</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <image width="1280" height="720">https://raw.githubusercontent.com/abullard1/Quoth/v0.1.0/data/screenshots/try-it.png</image>
+      <caption>Try private, offline dictation during guided setup</caption>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.1.0" date="2026-11-24" type="stable">
+      <description>
+        <p>First release of offline voice dictation for Linux on Wayland.</p>
+        <ul>
+          <li>Guided setup, microphone selection and configurable shortcuts</li>
+          <li>Local CPU and Vulkan transcription, with Intel NPU encoder support</li>
+          <li>Overlay themes, an experimental orb style and color skins for the app</li>
+          <li>Script control over D-Bus, and a tray item that copies the last dictation again</li>
+          <li>English translation, opt-in error reporting and package-manager update guidance</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,16 @@
+# Catppuccin Mocha (https://catppuccin.com): the Mocha base on the pill.
+schema = 1
+
+[meta]
+name        = "Catppuccin Mocha"
+author      = "Quoth (port of Catppuccin)"
+description = "Soothing pastels for the high-spirited, on the Mocha base."
+
+[colors]
+background       = "#1E1E2ED9" # Base
+border           = "#CDD6F41A" # Text
+accent           = "#CBA6F7E5" # Mauve
+text             = "#CDD6F4E5" # Text
+dot_recording    = "#A6E3A1"   # Green
+dot_transcribing = "#89DCEB"   # Sky
+dot_error        = "#F38BA8"   # Red

@@ -1,0 +1,16 @@
+# Nord (https://nordtheme.com): the arctic palette on the pill.
+schema = 1
+
+[meta]
+name        = "Nord"
+author      = "Quoth (port of Nord by Sven Greb)"
+description = "Polar night and frost: the arctic, north-bluish palette."
+
+[colors]
+background       = "#2E3440D9" # Polar Night nord0
+border           = "#ECEFF41A" # Snow Storm nord6
+accent           = "#88C0D0E5" # Frost nord8
+text             = "#ECEFF4E5" # Snow Storm nord6
+dot_recording    = "#A3BE8C"   # Aurora nord14
+dot_transcribing = "#81A1C1"   # Frost nord9
+dot_error        = "#BF616A"   # Aurora nord11

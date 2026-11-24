@@ -1,0 +1,49 @@
+# Built/staged native engine libs (whisper.cpp + ggml backends + the shim) and
+# the vendored OpenVINO NPU runtime (scripts/vendor_openvino.sh). All build
+# artifacts. The lib/ source (build_helper.sh, whisper_helper.c, .gitkeep) stays tracked.
+lib/*.so
+lib/*.so.*
+lib/openvino/
+lib/npu/
+lib/bin/
+lib/*.typelib
+lib/LICENSE.*
+
+# Python build and runtime artifacts.
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Test, coverage, lint, and import-analysis caches.
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.grimp_cache/
+.import_linter_cache/
+
+# Leftovers of a patch that applied with fuzz or failed.
+*.orig
+*.rej
+
+# Package build workspaces and fetched sources.
+.flatpak-builder/
+
+# .deb build harness: pre-fetched pinned native sources (whisper.cpp, OpenVINO
+# wheel, gtk4-layer-shell). Not part of the source.
+packaging/debian/.build-src/
+
+# Local editor and coding-agent state.
+.vscode/
+.idea/
+.claude/
+.codex/
+.agents/
+.superpowers/
+.commandcode/
+
+# The settings schema compiled for source runs (make schemas).
+data/gschemas.compiled

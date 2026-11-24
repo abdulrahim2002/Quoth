@@ -1,0 +1,251 @@
+{
+  "default": {
+    "palette": {
+      "background": [
+        0.055,
+        0.055,
+        0.067,
+        0.85
+      ],
+      "border": [
+        0.949,
+        0.941,
+        0.918,
+        0.1
+      ],
+      "accent": [
+        0.949,
+        0.941,
+        0.918,
+        0.9
+      ],
+      "text": [
+        0.949,
+        0.941,
+        0.918,
+        0.9
+      ],
+      "dot_recording": [
+        0.949,
+        0.941,
+        0.918,
+        1.0
+      ],
+      "dot_transcribing": [
+        0.949,
+        0.941,
+        0.918,
+        1.0
+      ],
+      "dot_error": [
+        0.8,
+        0.161,
+        0.212,
+        1.0
+      ]
+    },
+    "geometry": {
+      "width": 240,
+      "height": 48,
+      "border_width": 1.0,
+      "bar_gap": 3,
+      "line_width": 1.5
+    },
+    "position": {
+      "anchor": "bottom-center",
+      "margin": [
+        60,
+        60,
+        60,
+        60
+      ]
+    },
+    "font": {
+      "family": "sans-serif",
+      "size": 12
+    },
+    "animation": {
+      "enabled": true,
+      "duration_scale": 1.0,
+      "entry": {
+        "duration": 0.09,
+        "easing": "ease-out-cubic"
+      },
+      "exit": {
+        "duration": 0.15,
+        "easing": "ease-in-cubic"
+      }
+    },
+    "meta": {
+      "name": null,
+      "author": null,
+      "description": null
+    }
+  },
+  "full": {
+    "palette": {
+      "background": [
+        0.06274509803921569,
+        0.12549019607843137,
+        0.18823529411764706,
+        0.5019607843137255
+      ],
+      "border": [
+        0.25098039215686274,
+        0.3137254901960784,
+        0.3764705882352941,
+        0.25098039215686274
+      ],
+      "accent": [
+        0.4392156862745098,
+        0.5019607843137255,
+        0.5647058823529412,
+        1.0
+      ],
+      "text": [
+        0.6274509803921569,
+        0.6901960784313725,
+        0.7529411764705882,
+        1.0
+      ],
+      "dot_recording": [
+        0.06666666666666667,
+        0.13333333333333333,
+        0.2,
+        1.0
+      ],
+      "dot_transcribing": [
+        0.26666666666666666,
+        0.3333333333333333,
+        0.4,
+        1.0
+      ],
+      "dot_error": [
+        0.4666666666666667,
+        0.5333333333333333,
+        0.6,
+        1.0
+      ]
+    },
+    "geometry": {
+      "width": 320,
+      "height": 64,
+      "border_width": 2.0,
+      "bar_gap": 5,
+      "line_width": 2.5
+    },
+    "position": {
+      "anchor": "top-right",
+      "margin": [
+        10,
+        20,
+        30,
+        40
+      ]
+    },
+    "font": {
+      "family": "monospace",
+      "size": 15
+    },
+    "animation": {
+      "enabled": true,
+      "duration_scale": 1.5,
+      "entry": {
+        "duration": 0.3,
+        "easing": "linear"
+      },
+      "exit": {
+        "duration": 0.4,
+        "easing": "ease-out-back"
+      }
+    },
+    "meta": {
+      "name": "V1 reference",
+      "author": "Quoth tests",
+      "description": null
+    }
+  },
+  "partial": {
+    "palette": {
+      "background": [
+        0.055,
+        0.055,
+        0.067,
+        0.85
+      ],
+      "border": [
+        0.949,
+        0.941,
+        0.918,
+        0.1
+      ],
+      "accent": [
+        0.8,
+        0.5333333333333333,
+        0.26666666666666666,
+        1.0
+      ],
+      "text": [
+        0.949,
+        0.941,
+        0.918,
+        0.9
+      ],
+      "dot_recording": [
+        0.949,
+        0.941,
+        0.918,
+        1.0
+      ],
+      "dot_transcribing": [
+        0.949,
+        0.941,
+        0.918,
+        1.0
+      ],
+      "dot_error": [
+        0.8,
+        0.161,
+        0.212,
+        1.0
+      ]
+    },
+    "geometry": {
+      "width": 240,
+      "height": 48,
+      "border_width": 1.0,
+      "bar_gap": 3,
+      "line_width": 1.5
+    },
+    "position": {
+      "anchor": "bottom-center",
+      "margin": [
+        60,
+        60,
+        60,
+        60
+      ]
+    },
+    "font": {
+      "family": "sans-serif",
+      "size": 12
+    },
+    "animation": {
+      "enabled": true,
+      "duration_scale": 1.0,
+      "entry": {
+        "duration": 0.09,
+        "easing": "ease-out-cubic"
+      },
+      "exit": {
+        "duration": 0.15,
+        "easing": "linear"
+      }
+    },
+    "meta": {
+      "name": null,
+      "author": null,
+      "description": null
+    }
+  }
+}

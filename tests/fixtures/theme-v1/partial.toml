@@ -1,0 +1,5 @@
+# Legacy files may omit schema and most settings.
+[colors]
+accent = "#cc8844"
+[animation.exit]
+easing = "linear"

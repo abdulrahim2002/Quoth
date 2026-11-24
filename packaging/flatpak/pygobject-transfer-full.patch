@@ -1,0 +1,22 @@
+Upstream-Status: Not submitted
+Remove after the runtime fixes transferred boxed-array ownership and passes
+shortcut assignment access, cleanup and desktop registration checks.
+
+diff --git a/gi/pygi-cache-array.c b/gi/pygi-cache-array.c
+index 3dc9343..39405f0 100644
+--- a/gi/pygi-cache-array.c
++++ b/gi/pygi-cache-array.c
+@@ -734,8 +734,12 @@ _pygi_marshal_cleanup_to_py_array (PyGIInvokeState *state,
+     if (free_array) {
+         if (array_ != NULL)
+             g_array_free (array_, free_array_full);
+-        else
++        else {
++            /* Full-transfer elements already have per-item ownership. */
++            if (arg_cache->transfer == GI_TRANSFER_EVERYTHING)
++                g_ptr_array_set_free_func (ptr_array_, NULL);
+             g_ptr_array_free (ptr_array_, free_array_full);
++        }
+     }
+ }
+ 

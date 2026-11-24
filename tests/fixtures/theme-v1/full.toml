@@ -1,0 +1,33 @@
+schema = 1
+[meta]
+name = "V1 reference"
+author = "Quoth tests"
+[colors]
+background = "#10203080"
+border = "#40506040"
+accent = "#708090ff"
+text = "#a0b0c0ff"
+dot_recording = "#112233"
+dot_transcribing = "#445566"
+dot_error = "#778899"
+[geometry]
+width = 320
+height = 64
+border_width = 2.0
+bar_gap = 5
+line_width = 2.5
+[position]
+anchor = "top-right"
+margin = [10, 20, 30, 40]
+[font]
+family = "monospace"
+size = 15
+[animation]
+enabled = true
+duration_scale = 1.5
+[animation.entry]
+duration = 0.3
+easing = "linear"
+[animation.exit]
+duration = 0.4
+easing = "ease-out-back"
